@@ -1,3 +1,23 @@
 spring:
   application:
     name: backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/platformaegov
+    username: postgres
+    password: 123
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
+
+server:
+  port: 8080
+
+jwt:
+  secret: "fj39FJ3!fajf93jF93Jf93jf93jf9F3FJaf93jfa9f3Jf93F9ajf9A93f"
+  expiration-ms: 604800000
