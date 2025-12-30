@@ -55,8 +55,8 @@ const Register = () => {
   return (
     <div className="register-page">
       <div className="register-header">
-        <h1>Join the Eco-System</h1>
-        <p>Connect with mentors, build projects, and grow your skills.</p>
+        <h1>European Network of Young Green Entrepreneurs</h1>
+        <p>Youngreenteco-Ecosystem platform</p>
       </div>
 
       <main className="register-container">
@@ -65,7 +65,7 @@ const Register = () => {
             <h2>Choose your role</h2>
 
             <div className="role-grid">
-              {["ANTREPRENOR", "MENTOR", "INVESTITOR", "PRODUCATOR"].map(r => (
+              {["ENTREPRENEURS", "MENTORS", "INVESTORS", "MANUFACTURERS"].map(r => (
                 <label key={r} className={`role-card ${role === r ? "active" : ""}`}>
                   <input
                     type="radio"

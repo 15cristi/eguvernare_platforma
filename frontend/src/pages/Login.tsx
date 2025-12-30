@@ -42,43 +42,58 @@ const Login = () => {
       {/* LEFT */}
       <section className="login-left">
         <div className="left-content">
-          <span className="brand">Collaborate</span>
+          
 
           <h1 className="hero-title">
-            Connect.<br />
-            Collaborate.<br />
-            <span className="accent">Innovate.</span>
+            European Network<br />
+            of Young Green Entrepreneurs.<br />
+            <span className="accent">Youngreenteco</span>
           </h1>
 
-          <p className="hero-subtitle">
-            Where Entrepreneurs, Mentors, and Students collide.
-          </p>
+          
 
-          <div className="features">
-            <div className="feature">
-              <span className="icon"><FaShieldAlt /></span>
-              <div>
-                <h3>Secure authentication</h3>
-                <p>Enterprise-grade security.</p>
-              </div>
-            </div>
-
-            <div className="feature">
-              <span className="icon"><FaUsers /></span>
-              <div>
-                <h3>Role-based access</h3>
-                <p>Tailored experiences.</p>
-              </div>
-            </div>
-
-            <div className="feature">
-              <span className="icon"><FaBolt /></span>
-              <div>
-                <h3>Real-time matching</h3>
-                <p>Instant connections.</p>
-              </div>
+        <div className="features">
+          <div className="feature">
+            <span className="icon"><FaUsers /></span>
+            <div>
+              <h3>Entrepreneurs</h3>
+              <p>
+                Find mentors, investors, and partners aligned with your startup stage and domain.
+              </p>
             </div>
           </div>
+
+          <div className="feature">
+            <span className="icon"><FaUsers /></span>
+            <div>
+              <h3>Mentors</h3>
+              <p>
+                Share expertise, guide founders, and engage only in areas where you add real value.
+              </p>
+            </div>
+          </div>
+
+          <div className="feature">
+            <span className="icon"><FaUsers /></span>
+            <div>
+              <h3>Investors</h3>
+              <p>
+                Discover vetted startups by sector, maturity, and traction, without noisy deal flow.
+              </p>
+            </div>
+          </div>
+
+          <div className="feature">
+            <span className="icon"><FaUsers /></span>
+            <div>
+              <h3>Manufacturers</h3>
+              <p>
+                Connect with startups ready to prototype, scale production, or industrialize ideas.
+              </p>
+            </div>
+          </div>
+        </div>
+
         </div>
       </section>
 
