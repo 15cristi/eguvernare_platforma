@@ -1,7 +1,7 @@
 package com.platforma.backend.user;
 
 public enum Role {
-    Citizen,
+    CITIZEN,
     ANTREPRENOR,
     MENTOR,
     INVESTITOR,

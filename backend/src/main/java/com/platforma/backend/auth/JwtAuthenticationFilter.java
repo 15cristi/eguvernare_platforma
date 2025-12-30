@@ -28,6 +28,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain chain)
             throws ServletException, IOException {
 
+        String path = req.getServletPath();
+
+        // 🔓 NU filtrăm endpoint-urile de auth
+        if (path.startsWith("/api/auth")) {
+            chain.doFilter(req, res);
+            return;
+        }
+
         String header = req.getHeader("Authorization");
 
         if (header == null || !header.startsWith("Bearer ")) {
@@ -39,6 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String email = jwtService.extractUsername(token);
 
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
             UserDetails user = userRepository.findByEmail(email).orElse(null);
 
             if (user != null && jwtService.isValid(token, (User) user)) {

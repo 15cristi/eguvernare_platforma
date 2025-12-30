@@ -1,10 +1,15 @@
 package com.platforma.backend.auth;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 
-@Data
-@AllArgsConstructor
+@Getter
 public class AuthResponse {
-    private String token;
+
+    private final String token;
+    private final UserDto user;
+
+    public AuthResponse(String token, UserDto user) {
+        this.token = token;
+        this.user = user;
+    }
 }

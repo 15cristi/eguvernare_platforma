@@ -1,4 +1,7 @@
 package com.platforma.backend.profile;
 
-public class ExperienceLevel {
+public enum ExperienceLevel {
+    JUNIOR,
+    MID,
+    SENIOR
 }

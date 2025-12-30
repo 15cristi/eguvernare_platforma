@@ -16,6 +16,9 @@ public class Profile {
     @Id
     private Long id; // SAME ca user.id
 
+    @Column(length = 500)
+    private String avatarUrl;
+
     @OneToOne
     @MapsId
     @JoinColumn(name = "user_id")

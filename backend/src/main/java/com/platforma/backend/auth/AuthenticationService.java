@@ -1,5 +1,6 @@
 package com.platforma.backend.auth;
 
+import com.platforma.backend.profile.ProfileService;
 import com.platforma.backend.user.User;
 import com.platforma.backend.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ public class AuthenticationService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final ProfileService profileService;
 
     public AuthResponse register(RegisterRequest request) {
 
@@ -29,7 +31,15 @@ public class AuthenticationService {
                 .build();
 
         userRepository.save(user);
-        return new AuthResponse(jwtService.generateToken(user));
+        profileService.createProfileForUser(user);
+
+
+        String token = jwtService.generateToken(user);
+
+        return new AuthResponse(
+                token,
+                new UserDto(user)
+        );
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -41,6 +51,11 @@ public class AuthenticationService {
             throw new RuntimeException("Invalid password");
         }
 
-        return new AuthResponse(jwtService.generateToken(user));
+        String token = jwtService.generateToken(user);
+
+        return new AuthResponse(
+                token,
+                new UserDto(user)
+        );
     }
 }

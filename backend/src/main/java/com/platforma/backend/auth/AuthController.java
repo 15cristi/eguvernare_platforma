@@ -4,6 +4,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import com.platforma.backend.profile.ProfileService;
 
 import com.platforma.backend.user.Role;
 import com.platforma.backend.user.User;
@@ -25,7 +26,7 @@ public class AuthController {
     private final AuthenticationService authService;
     private final UserRepository userRepository;
     private final JwtService jwtService;
-
+    private final ProfileService profileService;
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
         return ResponseEntity.ok(authService.register(req));
@@ -43,7 +44,7 @@ public class AuthController {
 
         GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                 new NetHttpTransport(),
-                GsonFactory.getDefaultInstance() // <<==== FIX CRITIC
+                GsonFactory.getDefaultInstance()
         )
                 .setAudience(Collections.singletonList(
                         "285914242531-jq1gc46vt16ksngardsone3l7k61b9n7.apps.googleusercontent.com"
@@ -63,22 +64,35 @@ public class AuthController {
             String email = payload.getEmail();
             String fullName = (String) payload.get("name");
 
-            // Split la nume
-            String[] parts = fullName != null ? fullName.split(" ", 2) : new String[]{"", ""};
+            String[] parts = fullName != null
+                    ? fullName.split(" ", 2)
+                    : new String[]{"", ""};
 
-            User user = userRepository.findByEmail(email).orElseGet(() -> {
-                User newUser = new User();
-                newUser.setEmail(email);
-                newUser.setFirstName(parts[0]);
-                newUser.setLastName(parts.length > 1 ? parts[1] : "");
-                newUser.setPassword("");
-                newUser.setRole(Role.CITIZEN);
-                return userRepository.save(newUser);
-            });
+            User user = userRepository.findByEmail(email).orElse(null);
+
+            // 🔥 USER NOU
+            if (user == null) {
+                user = new User();
+                user.setEmail(email);
+                user.setFirstName(parts[0]);
+                user.setLastName(parts.length > 1 ? parts[1] : "");
+                user.setPassword(""); // Google user
+                user.setRole(Role.CITIZEN);
+
+                user = userRepository.save(user);
+
+                // 🔥 AICI SE CREEAZĂ PROFILE
+                profileService.createProfileForUser(user);
+            }
 
             String jwt = jwtService.generateToken(user);
 
-            return ResponseEntity.ok(Map.of("token", jwt));
+            return ResponseEntity.ok(
+                    new AuthResponse(
+                            jwt,
+                            new UserDto(user)
+                    )
+            );
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -86,4 +100,5 @@ public class AuthController {
                     .body("Google authentication failed");
         }
     }
+
 }

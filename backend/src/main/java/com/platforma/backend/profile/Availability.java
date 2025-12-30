@@ -1,4 +1,7 @@
 package com.platforma.backend.profile;
 
-public class Availability {
+public enum Availability {
+    FULL_TIME,
+    PART_TIME,
+    WEEKENDS
 }
