@@ -120,3 +120,11 @@
   color: #22c55e;
   cursor: pointer;
 }
+.google-placeholder {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fca5a5;
+  font-size: 14px;
+}

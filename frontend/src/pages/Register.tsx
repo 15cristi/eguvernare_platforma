@@ -5,6 +5,15 @@ import type { CredentialResponse } from "@react-oauth/google";
 import { registerUser, loginWithGoogle } from "../api/auth";
 import "./Register.css";
 
+const ROLES = [
+  "ENTREPRENEURS",
+  "MENTORS",
+  "INVESTORS",
+  "MANUFACTURERS"
+] as const;
+
+type Role = typeof ROLES[number];
+
 const Register = () => {
   const navigate = useNavigate();
 
@@ -12,20 +21,25 @@ const Register = () => {
   const [lastName, setLast] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("ANTREPRENOR");
+  const [role, setRole] = useState<Role | null>(null);
 
   const [errors, setErrors] = useState<{
     email?: string;
     password?: string;
+    role?: string;
   }>({});
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const newErrors: { email?: string; password?: string } = {};
+    const newErrors: typeof errors = {};
+
+    if (!role) {
+      newErrors.role = "Please select a role";
+    }
 
     if (!email.includes("@")) {
-      newErrors.email = "Email must contain the @ symbol";
+      newErrors.email = "Invalid email address";
     }
 
     if (!/[A-Z]/.test(password)) {
@@ -38,35 +52,53 @@ const Register = () => {
     if (Object.keys(newErrors).length > 0) return;
 
     try {
+      if (!role) return;
       await registerUser(firstName, lastName, email, password, role);
       navigate("/login");
     } catch {
-      setErrors({ password: "Registration failed. Please try again." });
+      setErrors({
+        password: "Registration failed. Please try again."
+      });
     }
   };
 
   const handleGoogleSuccess = async (res: CredentialResponse) => {
-    if (!res.credential) return;
-    const data = await loginWithGoogle(res.credential);
-    localStorage.setItem("token", data.token);
-    navigate("/dashboard");
-  };
+  if (!res.credential) return;
+
+  if (!role) {
+    alert("Please select a role before continuing");
+    return;
+  }
+
+  const data = await loginWithGoogle(res.credential, role);
+  localStorage.setItem("token", data.token);
+  navigate("/dashboard");
+};
+
 
   return (
     <div className="register-page">
       <div className="register-header">
         <h1>European Network of Young Green Entrepreneurs</h1>
-        <p>Youngreenteco-Ecosystem platform</p>
+        <p>Younggreenteco Ecosystem Platform</p>
       </div>
 
       <main className="register-container">
         <form className="register-form" onSubmit={handleRegister}>
+          {/* ROLE */}
           <section>
             <h2>Choose your role</h2>
 
+            {errors.role && (
+              <p className="input-error">{errors.role}</p>
+            )}
+
             <div className="role-grid">
-              {["ENTREPRENEURS", "MENTORS", "INVESTORS", "MANUFACTURERS"].map(r => (
-                <label key={r} className={`role-card ${role === r ? "active" : ""}`}>
+              {ROLES.map(r => (
+                <label
+                  key={r}
+                  className={`role-card ${role === r ? "active" : ""}`}
+                >
                   <input
                     type="radio"
                     name="role"
@@ -80,6 +112,7 @@ const Register = () => {
             </div>
           </section>
 
+          {/* BASIC INFO */}
           <section>
             <h2>Basic information</h2>
 
@@ -125,10 +158,18 @@ const Register = () => {
 
           <div className="divider">OR</div>
 
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => alert("Google error")}
-          />
+          {role ? (
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => alert("Google authentication failed")}
+            />
+          ) : (
+            <p className="input-error">
+              Please select a role to continue with Google
+            </p>
+          )}
+
+
 
           <p className="bottom-text">
             Already have an account?

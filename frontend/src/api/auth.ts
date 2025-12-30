@@ -24,9 +24,15 @@ export const registerUser = async (
   return res.data;
 };
 
-export const loginWithGoogle = async (googleToken: string) => {
+export const loginWithGoogle = async (
+  googleToken: string,
+  role?: string
+) => {
   const res = await axios.post(`${API_URL}/google`, {
     token: googleToken,
+    role
   });
   return res.data;
 };
+
+
