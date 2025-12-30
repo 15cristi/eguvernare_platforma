@@ -5,139 +5,132 @@ import { useContext, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { loginUser, loginWithGoogle } from "../api/auth";
 import { useNavigate } from "react-router-dom";
-import { FaShieldAlt, FaUsers, FaSync } from "react-icons/fa";
+import { FaShieldAlt, FaUsers, FaBolt, FaEnvelope, FaLock } from "react-icons/fa";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { setToken } = useContext(AuthContext);
+  const { setToken ,setUser} = useContext(AuthContext);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const data = await loginUser(email, password);
       setToken(data.token);
+      setUser(data.user);
       navigate("/dashboard");
     } catch {
-      alert("Email sau parolă invalidă");
+      alert("Invalid credentials");
     }
   };
 
-  
   const handleGoogleSuccess = async (res: CredentialResponse) => {
-    if (!res.credential) {
-      alert("Token Google invalid.");
-      return;
-    }
+  if (!res.credential) return;
 
-    try {
-      const data = await loginWithGoogle(res.credential);
-      setToken(data.token);
-      navigate("/dashboard");
-    } catch {
-      alert("Eroare la autentificarea cu Google");
-    }
-  };
+  const data = await loginWithGoogle(res.credential);
+
+  setToken(data.token);
+  setUser(data.user); // 🔥 LINIA LIPSĂ
+  navigate("/dashboard");
+};
+
 
   return (
     <div className="login-page">
-    <div className="login-container">
+      {/* LEFT */}
+      <section className="login-left">
+        <div className="left-content">
+          <span className="brand">Collaborate</span>
 
-      {}
-      <div className="left-info">
-        
+          <h1 className="hero-title">
+            Connect.<br />
+            Collaborate.<br />
+            <span className="accent">Innovate.</span>
+          </h1>
 
-        
+          <p className="hero-subtitle">
+            Where Entrepreneurs, Mentors, and Students collide.
+          </p>
 
-        <h1 className="main-title">Universitate și Industrie</h1>
-        <p className="subtitle">Platformă de colaborare</p>
+          <div className="features">
+            <div className="feature">
+              <span className="icon"><FaShieldAlt /></span>
+              <div>
+                <h3>Secure authentication</h3>
+                <p>Enterprise-grade security.</p>
+              </div>
+            </div>
 
-        <div className="features">
-          <div className="feature">
-            <i className="icon"><FaShieldAlt /></i>
-            <div>
-              <h3>Autentificare securizată</h3>
-              <p>Datele dvs. sunt protejate cu criptare SSL</p>
+            <div className="feature">
+              <span className="icon"><FaUsers /></span>
+              <div>
+                <h3>Role-based access</h3>
+                <p>Tailored experiences.</p>
+              </div>
+            </div>
+
+            <div className="feature">
+              <span className="icon"><FaBolt /></span>
+              <div>
+                <h3>Real-time matching</h3>
+                <p>Instant connections.</p>
+              </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          <div className="feature">
-              <i className="icon"><FaUsers /></i>
-            <div>
-              <h3>Acces bazat pe roluri</h3>
-              <p>Autorizare specifică pentru fiecare utilizator</p>
-            </div>
+      {/* RIGHT */}
+      <section className="login-right">
+        <div className="login-box">
+          <h2>Welcome Back</h2>
+          <p className="subtitle">Enter your credentials to access your workspace</p>
+
+          <form onSubmit={handleSubmit}>
+            <label>Email Address</label>
+            <div className="input-wrapper">
+            <span className="input-icon"><FaEnvelope /></span>
+            <input
+              type="email"
+              placeholder="name@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+            />
           </div>
 
-          <div className="feature">
-              <i className="icon"><FaSync /></i>
 
-            <div>
-              <h3>În timp real</h3>
-              <p>Notificări și actualizări instantanee</p>
+            <label>Password</label>
+            <div className="input-wrapper">
+              <FaLock className="input-icon" />
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+              />
             </div>
+
+            <button className="primary-btn">Log In</button>
+          </form>
+
+          <div className="divider">OR CONTINUE WITH</div>
+
+          <div className="oauth">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => alert("Google error")}
+            />
           </div>
+
+          <p className="bottom-text">
+            Don’t have an account?
+            <span onClick={() => navigate("/register")}> Register now</span>
+          </p>
         </div>
-      </div>
-
-      {/* LOGIN CARD */}
-      <div className="login-card">
-        <h2>Autentificare comună</h2>
-        <p className="card-subtitle">
-          Conectați-vă cu adresa dvs. de email instituțională
-        </p>
-
-        <div className="info-box">
-          Numele dvs. de utilizator este adresa dvs. de email.  
-          Dacă uitați parola, folosiți opțiunea „Am uitat parola”.
-        </div>
-
-        {/* FORMULAR LOGIN */}
-        <form onSubmit={handleSubmit}>
-          <label>Email</label>
-          <input
-            type="email"
-            placeholder="nume.prenume@universitate.ro"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-          />
-
-          <label>Parolă</label>
-          <input
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-          />
-
-          <button type="submit" className="primary-btn">
-            Log in
-          </button>
-        </form>
-
-        <div className="divider">sau</div>
-
-        {/* GOOGLE LOGIN */}
-        <div className="google-login">
-        <GoogleLogin 
-            onSuccess={handleGoogleSuccess}
-            onError={() => alert("Eroare la Google")}
-        />
-        </div>
-
-        <div className="register-section">
-          Nu ai un cont?
-          <span onClick={() => navigate("/register")}>
-            Înregistrează-te acum
-          </span>
-        </div>
-      </div>
-    </div>  
+      </section>
     </div>
   );
 };

@@ -1,164 +1,122 @@
 .register-page {
-    position: fixed;
-    top: 0;
-    left: 0;
-
-    width: 100vw;
-    height: 100vh;
-
-    background: linear-gradient(135deg, #016A4A 0%, #079669 50%, #1ACB8B 100%);
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;   
-    padding-top: 40px;         
-    overflow: hidden;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #064e3b, #022c22);
+  color: white;
+  padding: 40px 20px;
+  font-family: Inter, sans-serif;
 }
 
-
-
-.register-card {
-    width: 450px;
-    background: #ffffff;
-    padding: 24px 30px;        
-    border-radius: 18px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
-    animation: fadeIn 0.4s ease;
-
-    max-height: 90vh;          
-    overflow-y: auto;          
+.register-header {
+  max-width: 800px;
+  margin: 0 auto 30px;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to   { opacity: 1; transform: translateY(0); }
+.register-header h1 {
+  font-size: 36px;
+  font-weight: 900;
 }
 
-.register-card h2 {
-    text-align: center;
-    font-size: 26px;
-    margin-bottom: 4px;
-    color: #2B3A50;
+.register-header p {
+  opacity: 0.75;
 }
 
-.subtitle {
-    text-align: center;
-    opacity: 0.7;
-    margin-bottom: 18px;       
-    font-size: 14px;
+.register-container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #0a261d;
+  border-radius: 18px;
+  padding: 32px;
+  border: 1px solid #143326;
 }
 
-
-
-.form-group {
-    margin-bottom: 10px;       
+.register-form section {
+  margin-bottom: 32px;
 }
 
-.form-group label {
-    display: block;
-    margin-bottom: 4px;        
-    font-weight: 600;
-    font-size: 14px;
-    color: #2B3A50;
+.register-form h2 {
+  font-size: 20px;
+  margin-bottom: 16px;
 }
 
-
-
-input {
-    width: 95%;
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid #dfe3e8; 
-    font-size: 20px;
-    transition: 0.2s ease;
-    background: white;
+/* ROLE */
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
 }
 
-select {
-    width: 100%;
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid #dfe3e8; 
-    font-size: 20px;
-    transition: 0.2s ease;
-    background: white;
+.role-card {
+  border: 1px solid #254636;
+  border-radius: 14px;
+  padding: 16px;
+  cursor: pointer;
+  background: #052117;
+  transition: 0.2s;
 }
 
-input:focus,
-select:focus {
-    border-color: #0F4C81;
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(15, 76, 129, 0.15);
+.role-card input {
+  display: none;
 }
 
+.role-card.active {
+  border-color: #16a34a;
+  background: rgba(22, 163, 74, 0.1);
+}
 
+/* FORM GRID */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
 
+.form-grid input {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid #254636;
+  background: #052117;
+  color: white;
+}
+
+/* ELEMENTE CARE OCUPĂ TOT RÂNDUL */
+.full-row {
+  grid-column: 1 / -1;
+}
+
+/* ERRORS */
+.input-error {
+  margin-top: -6px;
+  font-size: 13px;
+  color: #f87171;
+  grid-column: 1 / -1;
+}
+
+/* BUTTON */
 .primary-btn {
-    width: 100%;
-    padding: 12px;
-    margin-top: 10px;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: 600;
-    color: white;
-    background: linear-gradient(35deg, #016A4A 0%, #079669 50%, #1ACB8B 100%);
-    transition: 0.2s ease;
+  width: 100%;
+  height: 48px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
 }
-
-
-.primary-btn:hover {
-    filter: brightness(1.08);
-}
-
-
 
 .divider {
-    text-align: center;
-    margin: 14px 0;
-    color: #666;
-    font-size: 14px;
+  text-align: center;
+  margin: 24px 0;
+  opacity: 0.6;
 }
-
-
-
-.google-register > div {
-    width: 100% !important;
-}
-
-.google-register iframe {
-    width: 100% !important;
-}
-
-
 
 .bottom-text {
-    text-align: center;
-    margin-top: 14px;
-    color: #666;
-    font-size: 14px;
+  text-align: center;
+  margin-top: 16px;
+  opacity: 0.7;
 }
 
 .bottom-text span {
-    color: #1A6FB5;
-    cursor: pointer;
-    transition: 0.2s ease;
-}
-
-.bottom-text span:hover {
-    text-decoration: underline;
-}
-
-
-
-@media (max-width: 480px) {
-    .register-card {
-        width: 75%;
-        padding: 20px;
-        max-height: 95vh;
-    }
-
-    .register-card h2 {
-        font-size: 22px;
-    }
+  color: #22c55e;
+  cursor: pointer;
 }

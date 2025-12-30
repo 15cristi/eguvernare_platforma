@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { registerUser, loginWithGoogle } from "../api/auth";
 import { useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import type { CredentialResponse } from "@react-oauth/google";
-
+import { registerUser, loginWithGoogle } from "../api/auth";
 import "./Register.css";
 
 const Register = () => {
@@ -12,119 +11,131 @@ const Register = () => {
   const [firstName, setFirst] = useState("");
   const [lastName, setLast] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("CITIZEN");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("ANTREPRENOR");
 
-  // FORM REGISTER
+  const [errors, setErrors] = useState<{
+    email?: string;
+    password?: string;
+  }>({});
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const newErrors: { email?: string; password?: string } = {};
+
+    if (!email.includes("@")) {
+      newErrors.email = "Email must contain the @ symbol";
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      newErrors.password = "Password must contain at least one uppercase letter";
+    } else if (!password.includes("!")) {
+      newErrors.password = "Password must contain the ! character";
+    }
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
     try {
       await registerUser(firstName, lastName, email, password, role);
-      navigate("/login"); 
+      navigate("/login");
     } catch {
-      alert("Eroare la înregistrare");
+      setErrors({ password: "Registration failed. Please try again." });
     }
   };
 
-  // GOOGLE REGISTER
   const handleGoogleSuccess = async (res: CredentialResponse) => {
-    if (!res.credential) {
-      alert("Token Google invalid");
-      return;
-    }
-
-    try {
-      const data = await loginWithGoogle(res.credential);
-        localStorage.setItem("token", data.token); // sau setToken dacă ai context
-        navigate("/dashboard");
-    } catch {
-      alert("Eroare la contul Google");
-    }
+    if (!res.credential) return;
+    const data = await loginWithGoogle(res.credential);
+    localStorage.setItem("token", data.token);
+    navigate("/dashboard");
   };
 
   return (
     <div className="register-page">
-      <div className="register-card">
-        <h2>Creare cont nou</h2>
-        <p className="subtitle">Completați informațiile de mai jos</p>
+      <div className="register-header">
+        <h1>Join the Eco-System</h1>
+        <p>Connect with mentors, build projects, and grow your skills.</p>
+      </div>
 
-        <form onSubmit={handleRegister}>
+      <main className="register-container">
+        <form className="register-form" onSubmit={handleRegister}>
+          <section>
+            <h2>Choose your role</h2>
 
-          <div className="form-group">
-            <label>Prenume</label>
-            <input
-              type="text"
-              placeholder="Prenume"
-              value={firstName}
-              onChange={e => setFirst(e.target.value)}
-              required
-            />
-          </div>
+            <div className="role-grid">
+              {["ANTREPRENOR", "MENTOR", "INVESTITOR", "PRODUCATOR"].map(r => (
+                <label key={r} className={`role-card ${role === r ? "active" : ""}`}>
+                  <input
+                    type="radio"
+                    name="role"
+                    value={r}
+                    checked={role === r}
+                    onChange={() => setRole(r)}
+                  />
+                  <span>{r}</span>
+                </label>
+              ))}
+            </div>
+          </section>
 
-          <div className="form-group">
-            <label>Nume</label>
-            <input
-              type="text"
-              placeholder="Nume"
-              value={lastName}
-              onChange={e => setLast(e.target.value)}
-              required
-            />
-          </div>
+          <section>
+            <h2>Basic information</h2>
 
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              placeholder="email@exemplu.ro"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-            />
-          </div>
+            <div className="form-grid">
+              <input
+                placeholder="First name"
+                value={firstName}
+                onChange={e => setFirst(e.target.value)}
+              />
 
-          <div className="form-group">
-            <label>Rol</label>
-            <select value={role} onChange={e => setRole(e.target.value)}>
-            <option value="ANTREPRENOR">Antreprenor</option>
-            <option value="MENTOR">Mentor</option>
-            <option value="INVESTITOR">Investitor</option>
-            <option value="PRODUCATOR">Producător</option>
-            </select>
-          </div>
+              <input
+                placeholder="Last name"
+                value={lastName}
+                onChange={e => setLast(e.target.value)}
+              />
 
-          <div className="form-group">
-            <label>Parola</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-            />
-          </div>
+              <input
+                className="full-row"
+                placeholder="Email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
 
-          <button className="primary-btn" type="submit">
-            Înregistrare
-          </button>
-        </form>
+              {errors.email && (
+                <p className="input-error">{errors.email}</p>
+              )}
 
-        <div className="divider">sau</div>
+              <input
+                className="full-row"
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+              />
 
-        {/* GOOGLE LOGIN */}
-        <div className="google-register">
+              {errors.password && (
+                <p className="input-error">{errors.password}</p>
+              )}
+            </div>
+          </section>
+
+          <button className="primary-btn">Create Account</button>
+
+          <div className="divider">OR</div>
+
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
-            onError={() => alert("Eroare la Google")}
+            onError={() => alert("Google error")}
           />
-        </div>
 
-        <p className="bottom-text">
-          Ai deja un cont?
-          <span onClick={() => navigate("/")}> Autentifică-te</span>
-        </p>
-      </div>
+          <p className="bottom-text">
+            Already have an account?
+            <span onClick={() => navigate("/")}> Log in</span>
+          </p>
+        </form>
+      </main>
     </div>
   );
 };
