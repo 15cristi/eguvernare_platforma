@@ -39,7 +39,7 @@ public class AuthController {
 
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody Map<String, String> body) {
-
+        String roleValue = body.get("role");
         String token = body.get("token");
 
         GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
@@ -72,16 +72,29 @@ public class AuthController {
 
             // 🔥 USER NOU
             if (user == null) {
+
+                if (roleValue == null) {
+                    return ResponseEntity.badRequest()
+                            .body("Role is required for new users");
+                }
+
+                Role role;
+                try {
+                    role = Role.valueOf(roleValue);
+                } catch (IllegalArgumentException e) {
+                    return ResponseEntity.badRequest()
+                            .body("Invalid role");
+                }
+
                 user = new User();
                 user.setEmail(email);
                 user.setFirstName(parts[0]);
                 user.setLastName(parts.length > 1 ? parts[1] : "");
                 user.setPassword(""); // Google user
-                user.setRole(Role.CITIZEN);
+                user.setRole(role);
 
                 user = userRepository.save(user);
 
-                // 🔥 AICI SE CREEAZĂ PROFILE
                 profileService.createProfileForUser(user);
             }
 
