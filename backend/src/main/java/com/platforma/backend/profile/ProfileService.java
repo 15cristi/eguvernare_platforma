@@ -4,6 +4,7 @@ import com.platforma.backend.user.User;
 import com.platforma.backend.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.platforma.backend.profile.dto.ProfileUpdateRequest;
 
 @Service
 @RequiredArgsConstructor
@@ -31,23 +32,40 @@ public class ProfileService {
                 });
     }
 
-    public Profile updateProfile(Long userId, Profile updated) {
-        Profile profile = getProfile(userId);
+    public Profile updateProfile(Long userId, ProfileUpdateRequest req) {
+        Profile p = profileRepository.findById(userId)
+                .orElseGet(() -> {
+                    Profile created = new Profile();
+                    created.setId(userId);
+                    return profileRepository.save(created);
+                });
 
-        profile.setHeadline(updated.getHeadline());
-        profile.setBio(updated.getBio());
-        profile.setCountry(updated.getCountry());
-        profile.setCity(updated.getCity());
-        profile.setAvailability(updated.getAvailability());
-        profile.setExperienceLevel(updated.getExperienceLevel());
-        profile.setOpenToProjects(updated.isOpenToProjects());
-        profile.setOpenToMentoring(updated.isOpenToMentoring());
-        profile.setLinkedinUrl(updated.getLinkedinUrl());
-        profile.setGithubUrl(updated.getGithubUrl());
-        profile.setWebsite(updated.getWebsite());
+        // dacă vrei update complet (null overwrite)
+        p.setHeadline(req.headline());
+        p.setBio(req.bio());
+        p.setCountry(req.country());
+        p.setCity(req.city());
+        p.setFaculty(req.faculty());
 
-        return profileRepository.save(profile);
+        p.setExpertAreas(req.expertAreas());
+
+        p.setCompanyName(req.companyName());
+        p.setCompanyDescription(req.companyDescription());
+        p.setCompanyDomains(req.companyDomains());
+
+        if (req.openToProjects() != null) p.setOpenToProjects(req.openToProjects());
+        if (req.openToMentoring() != null) p.setOpenToMentoring(req.openToMentoring());
+
+        p.setAvailability(req.availability());
+        p.setExperienceLevel(req.experienceLevel());
+
+        p.setLinkedinUrl(req.linkedinUrl());
+        p.setGithubUrl(req.githubUrl());
+        p.setWebsite(req.website());
+
+        return profileRepository.save(p);
     }
+
 
 
     public Profile updateAvatar(Long userId, String avatarUrl) {
