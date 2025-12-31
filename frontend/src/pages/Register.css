@@ -128,3 +128,49 @@
   color: #fca5a5;
   font-size: 14px;
 }
+.autocomplete {
+  position: relative;
+}
+
+.suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  background: #062e25;
+  border: 1px solid #164e41;
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 20;
+}
+
+.suggestion {
+  padding: 10px 12px;
+  cursor: pointer;
+  color: #e6f4ef;
+}
+
+.suggestion:hover {
+  background: #0c3b31;
+}
+.suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  background: #062e25;
+  border: 1px solid #164e41;
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 20;
+}
+
+.suggestion {
+  padding: 10px 12px;
+  cursor: pointer;
+  color: #e6f4ef;
+}
+
+.suggestion:hover {
+  background: #0c3b31;
+}

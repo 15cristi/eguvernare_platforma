@@ -43,7 +43,12 @@ const Dashboard = () => {
             >
               My Profile
             </NavLink>
-
+            <NavLink
+              to="/admin/lookups-upload"
+              className={({ isActive }) => (isActive ? "active" : "")}
+            >
+              Test
+            </NavLink>
             <span>Projects</span>
             <span>Publications</span>
             <span>Expertise / Skills</span>

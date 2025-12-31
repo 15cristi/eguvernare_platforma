@@ -227,3 +227,7 @@
   font-size: 18px;
   color: white;
 }
+select[multiple] {
+  height: auto;
+  min-height: 240px;
+}

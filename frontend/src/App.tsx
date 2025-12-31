@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
+import AdminLookupsUpload from "./pages/AdminLookupsUpload";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
@@ -27,6 +28,16 @@ function App() {
         element={
           <ProtectedRoute>
             <Profile />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ADMIN */}
+      <Route
+        path="/admin/lookups-upload"
+        element={
+          <ProtectedRoute>
+            <AdminLookupsUpload />
           </ProtectedRoute>
         }
       />
