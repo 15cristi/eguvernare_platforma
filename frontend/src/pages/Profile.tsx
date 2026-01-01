@@ -1,17 +1,13 @@
 import "./Profile.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getMyProfile, updateMyProfile, saveAvatarUrl } from "../api/profile";
 import { suggestLookup, upsertLookup } from "../api/lookups";
 import { uploadAvatarToCloudinary } from "../api/cloudinary";
+import { AuthContext } from "../context/AuthContext";
+import { SinglePicker } from "../components/SinglePicker";
 
 type Availability = "FULL_TIME" | "PART_TIME" | "WEEKENDS";
 type ExperienceLevel = "JUNIOR" | "MID" | "SENIOR";
-
-/**
- * Rolul este DOAR UI momentan.
- * NU este trimis la backend.
- */
-type Role = "DEVELOPER" | "MENTOR" | "ENTREPRENEUR";
 
 interface Profile {
   headline: string;
@@ -21,6 +17,7 @@ interface Profile {
 
   faculty: string;
   expertAreas: string[];
+
   companyName: string;
   companyDescription: string;
   companyDomains: string[];
@@ -33,23 +30,30 @@ interface Profile {
   githubUrl: string;
   website: string;
   avatarUrl?: string;
-
-  // doar frontend
-  role?: Role;
 }
 
 type LookupCategory = "CITY" | "COUNTRY" | "FACULTY" | "EXPERT_AREA" | "COMPANY_DOMAIN";
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ");
 
-// wrapper ca să nu te blochezi pe union-ul vechi din api/lookups.ts
-const suggest = (category: LookupCategory, q: string) =>
-  suggestLookup(category as any, q);
-
-const upsert = (category: LookupCategory, value: string) =>
-  upsertLookup(category as any, value);
+// wrappers ca să nu te blochezi pe union-uri din api/lookups.ts
+const suggest = (category: LookupCategory, q: string) => suggestLookup(category as any, q);
+const upsert = (category: LookupCategory, value: string) => upsertLookup(category as any, value);
 
 const ProfilePage = () => {
+  const { user } = useContext(AuthContext);
+
+  const backendRole = user?.role as
+    | "CITIZEN"
+    | "ENTREPRENEURS"
+    | "MENTORS"
+    | "INVESTORS"
+    | "MANUFACTURERS"
+    | "ADMIN"
+    | undefined;
+
+  const isCompanyRole = backendRole === "ENTREPRENEURS" || backendRole === "MANUFACTURERS";
+
   const [profile, setProfile] = useState<Profile | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -66,7 +70,14 @@ const ProfilePage = () => {
           bio: data.bio || "",
           country: data.country || "",
           city: data.city || "",
+
           faculty: data.faculty || "",
+          expertAreas: data.expertAreas || [],
+
+          companyName: data.companyName || "",
+          companyDescription: data.companyDescription || "",
+          companyDomains: data.companyDomains || [],
+
           availability: data.availability || "FULL_TIME",
           experienceLevel: data.experienceLevel || "JUNIOR",
           openToProjects: !!data.openToProjects,
@@ -74,12 +85,7 @@ const ProfilePage = () => {
           linkedinUrl: data.linkedinUrl || "",
           githubUrl: data.githubUrl || "",
           website: data.website || "",
-          avatarUrl: data.avatarUrl,
-          expertAreas: data.expertAreas || [],
-          companyName: data.companyName || "",
-          companyDescription: data.companyDescription || "",
-          companyDomains: data.companyDomains || [],
-          role: "DEVELOPER"
+          avatarUrl: data.avatarUrl
         });
       })
       .catch(() => {});
@@ -107,6 +113,7 @@ const ProfilePage = () => {
       p.website,
       p.avatarUrl,
       p.expertAreas,
+      // câmpuri companie (contează, chiar dacă nu sunt vizibile pentru toți)
       p.companyName,
       p.companyDescription,
       p.companyDomains
@@ -132,10 +139,13 @@ const ProfilePage = () => {
         country: profile.country,
         city: profile.city,
         faculty: profile.faculty,
+
         expertAreas: profile.expertAreas,
+
         companyName: profile.companyName,
         companyDescription: profile.companyDescription,
         companyDomains: profile.companyDomains,
+
         availability: profile.availability,
         experienceLevel: profile.experienceLevel,
         openToProjects: profile.openToProjects,
@@ -235,69 +245,30 @@ const ProfilePage = () => {
             </label>
 
             <div className="row">
-              <label>
-                Country
-                <input
-                  value={profile.country}
-                  list="country-suggestions"
-                  onChange={async (e) => {
-                    const v = e.target.value;
-                    update("country", v);
-                    try {
-                      const list = await suggest("COUNTRY", v);
-                      setCountrySuggestions(list);
-                    } catch {}
-                  }}
-                  onBlur={async () => {
-                    const v = norm(profile.country);
-                    if (!v) return;
-                    try {
-                      await upsert("COUNTRY", v);
-                    } catch {}
-                  }}
-                />
-                <datalist id="country-suggestions">
-                  {countrySuggestions.map((s) => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
-              </label>
+              <SinglePicker
+              label="Country"
+              category="COUNTRY"
+              value={profile.country}
+              onChange={(v) => update("country", v)}
+              placeholder="Search or add country"
+            />
 
-              <label>
-                City
-                <input
-                  value={profile.city}
-                  list="city-suggestions"
-                  onChange={async (e) => {
-                    const v = e.target.value;
-                    update("city", v);
-                    try {
-                      const list = await suggest("CITY", v);
-                      setCitySuggestions(list);
-                    } catch {}
-                  }}
-                  onBlur={async () => {
-                    const v = norm(profile.city);
-                    if (!v) return;
-                    try {
-                      await upsert("CITY", v);
-                    } catch {}
-                  }}
-                />
-                <datalist id="city-suggestions">
-                  {citySuggestions.map((s) => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
-              </label>
+            <SinglePicker
+              label="City"
+              category="CITY"
+              value={profile.city}
+              onChange={(v) => update("city", v)}
+              placeholder="Search or add city"
+            />
+
             </div>
           </div>
 
-          {/* AVAILABILITY + ROLE */}
+          {/* AVAILABILITY */}
           <div className="card">
             <div className="card-header">
               <span>🧠</span>
-              <h2>Availability & Role</h2>
+              <h2>Availability</h2>
             </div>
 
             <label>
@@ -321,15 +292,6 @@ const ProfilePage = () => {
               </select>
             </label>
 
-            <label>
-              Role
-              <select value={profile.role} onChange={(e) => update("role", e.target.value as Role)}>
-                <option value="DEVELOPER">Developer</option>
-                <option value="MENTOR">Mentor</option>
-                <option value="ENTREPRENEUR">Entrepreneur</option>
-              </select>
-            </label>
-
             <div className="checkboxes">
               <label>
                 <input
@@ -350,43 +312,23 @@ const ProfilePage = () => {
               </label>
             </div>
 
-            <label>
-              Faculty
-              <input
-                value={profile.faculty}
-                list="faculty-suggestions"
-                onChange={async (e) => {
-                  const v = e.target.value;
-                  update("faculty", v);
-                  try {
-                    const list = await suggest("FACULTY", v);
-                    setFacultySuggestions(list);
-                  } catch {}
-                }}
-                onBlur={async () => {
-                  const v = norm(profile.faculty);
-                  if (!v) return;
-                  try {
-                    await upsert("FACULTY", v);
-                  } catch {}
-                }}
-              />
-              <datalist id="faculty-suggestions">
-                {facultySuggestions.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
-            </label>
+            <SinglePicker
+              label="Faculty"
+              category="FACULTY"
+              value={profile.faculty}
+              onChange={(v) => update("faculty", v)}
+              placeholder="Search or add faculty"
+            />
           </div>
 
           {/* EXPERTISE / COMPANY */}
           <div className="card">
             <div className="card-header">
               <span>🧩</span>
-              <h2>{profile.role === "ENTREPRENEUR" ? "Company details" : "Expertise"}</h2>
+              <h2>{isCompanyRole ? "Company details" : "Expertise"}</h2>
             </div>
 
-            {profile.role === "ENTREPRENEUR" ? (
+            {isCompanyRole ? (
               <>
                 <label>
                   Company name
@@ -474,7 +416,7 @@ function TagPicker({ label, category, values, onChange, placeholder }: TagPicker
     const t = window.setTimeout(async () => {
       try {
         const items = await suggest(category, q);
-        const filtered = items.filter((i) => !selected.has(i.toLowerCase()));
+        const filtered = items.filter((i: string) => !selected.has(i.toLowerCase()));
         setSuggestions(filtered.slice(0, 10));
         setOpen(true);
       } catch {
@@ -509,7 +451,7 @@ function TagPicker({ label, category, values, onChange, placeholder }: TagPicker
     try {
       await upsert(category, v);
     } catch {
-      // dacă endpoint-ul e temporar / îl ștergi, nu blocăm userul
+      // ok, UI-ul merge oricum
     }
 
     setInput("");
