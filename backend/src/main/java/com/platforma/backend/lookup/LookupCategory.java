@@ -5,6 +5,8 @@ public enum LookupCategory {
     COUNTRY,
     FACULTY,
     EXPERT_AREA,
-    COMPANY_DOMAIN
+    COMPANY_DOMAIN,
+    AFFILIATION,
+    PROFESSION
 }
 

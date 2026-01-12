@@ -11,9 +11,20 @@ public record ProfileResponse(
         String bio,
         String country,
         String city,
+
+        String affiliation,
+        String profession,
+        String university,
+
         String faculty,
 
+        // legacy (flat)
         List<String> expertAreas,
+
+        // new (with descriptions)
+        List<ExpertiseItemDto> expertise,
+
+        List<ResourceItemDto> resources,
 
         String companyName,
         String companyDescription,

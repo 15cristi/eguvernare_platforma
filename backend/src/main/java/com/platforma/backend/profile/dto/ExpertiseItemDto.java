@@ -1,4 +1,6 @@
 package com.platforma.backend.profile.dto;
 
-public class ExpertiseItemDto {
-}
+public record ExpertiseItemDto(
+        String area,
+        String description
+) {}

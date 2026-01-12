@@ -1,4 +1,7 @@
 package com.platforma.backend.profile.dto;
 
-public class ResourceItemDto {
-}
+public record ResourceItemDto(
+        String title,
+        String description,
+        String url
+) {}

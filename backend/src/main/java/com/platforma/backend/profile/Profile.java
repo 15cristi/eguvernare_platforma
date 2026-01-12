@@ -35,13 +35,31 @@ public class Profile {
     private String country;
     private String city;
 
+    // 🔹 Basic identity (same for everyone)
+    private String affiliation;
+    private String profession;
+    private String university;
+
     private String faculty;
 
-    // 🔹 Areas (user expertise / interests)
+    /**
+     * Legacy flat list kept for backwards compatibility.
+     * New UI should use {@link #expertise}.
+     */
     @ElementCollection
     @CollectionTable(name = "profile_expert_areas", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "expert_area", length = 120)
     private List<String> expertAreas;
+
+    // 🔹 Expertise with per-item description
+    @ElementCollection
+    @CollectionTable(name = "profile_expertise", joinColumns = @JoinColumn(name = "user_id"))
+    private List<ProfileExpertise> expertise;
+
+    // 🔹 Labs / resources shown on profile
+    @ElementCollection
+    @CollectionTable(name = "profile_resources", joinColumns = @JoinColumn(name = "user_id"))
+    private List<ProfileResource> resources;
 
     // 🔹 Company / startup (for roles that represent organizations)
     private String companyName;
