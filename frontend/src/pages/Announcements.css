@@ -1,0 +1,462 @@
+/* ====== PAGE SHELL (LinkedIn-ish: feed + right sidebar) ====== */
+.annShell {
+  width: min(1480px, calc(100% - 56px));
+  margin: 0 auto;
+  padding: 22px 0 46px;
+  display: grid;
+  grid-template-columns: minmax(620px, 1fr) 380px;
+  gap: 18px;
+  align-items: start;
+  color: #eaf7f1;
+}
+
+.annPage {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.annRight {
+  position: sticky;
+  top: 90px;
+  height: fit-content;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.annSideCard {
+  padding: 18px;
+}
+
+.annSideTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.annSideGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.annSideStat {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.annSideStat strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 16px;
+}
+
+.annSideHint {
+  margin-top: 12px;
+  font-size: 12px;
+  opacity: 0.7;
+  line-height: 1.4;
+}
+
+.annTrendList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.annTrendItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.annTrendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.75);
+  margin-top: 5px;
+  box-shadow: 0 10px 25px rgba(34, 197, 94, 0.18);
+}
+
+/* ====== HEADER ====== */
+.annHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.annHeader h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: 0.2px;
+}
+
+.annSub {
+  display: block;
+  margin-top: 5px;
+  font-size: 13px;
+  opacity: 0.72;
+}
+
+/* ====== BASE CARD ====== */
+.card {
+  background: rgba(6, 78, 59, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 22px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+}
+
+/* ====== BUTTONS ====== */
+.btn-outline {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #eaf7f1;
+  padding: 10px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-primary {
+  height: 42px;
+  border-radius: 14px;
+  border: none;
+  background: #16a34a;
+  color: white;
+  font-weight: 750;
+  cursor: pointer;
+  padding: 0 16px;
+  transition: transform 0.12s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+}
+
+/* ====== COMPOSER ====== */
+.annComposer {
+  padding: 18px;
+}
+
+.annComposer textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 170px; /* mai mare ca înainte */
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(2, 44, 34, 0.35);
+  color: #eaf7f1;
+  outline: none;
+  padding: 14px 14px;
+  line-height: 1.55;
+  font-size: 14px;
+}
+
+.annComposer textarea::placeholder {
+  color: rgba(234, 247, 241, 0.55);
+}
+
+.annComposer textarea:focus {
+  border-color: rgba(34, 197, 94, 0.35);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+}
+
+.annComposerBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.annComposerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.annFile {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ====== IMAGE PREVIEW ====== */
+.annImagePreview {
+  margin-top: 12px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(2, 44, 34, 0.35);
+}
+
+.annImagePreview img {
+  width: 100%;
+  max-height: 520px;
+  object-fit: cover;
+  display: block;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.annRemoveImage {
+  width: 100%;
+  height: 46px;
+  border: none;
+  cursor: pointer;
+  background: rgba(248, 113, 113, 0.10);
+  color: #fecaca;
+  font-weight: 800;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.annRemoveImage:hover {
+  background: rgba(248, 113, 113, 0.14);
+}
+
+/* ====== FEED ====== */
+.annFeed {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ====== POST CARD ====== */
+.annPost {
+  padding: 18px;
+}
+
+.annPostHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.annAuthor {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatarSmall {
+  width: 44px;
+  height: 44px;
+  border-radius: 18px;
+  background: rgba(22, 163, 74, 0.25);
+  border: 1px solid rgba(22, 163, 74, 0.18);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+}
+
+.annAuthor strong {
+  display: block;
+  font-size: 14px;
+  letter-spacing: 0.1px;
+}
+
+.muted {
+  font-size: 12px;
+  opacity: 0.72;
+}
+
+.annContent {
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 4px 0 10px;
+}
+
+/* ====== POST IMAGE (se vede bine, mare) ====== */
+.annPostImage {
+  margin-top: 10px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(2, 44, 34, 0.35);
+}
+
+.annPostImage img {
+  width: 100%;
+  max-height: 760px;
+  object-fit: cover;
+  display: block;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* ====== META COUNTS ====== */
+.annMeta {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  opacity: 0.75;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ====== ACTIONS ====== */
+.annActions {
+  display: flex;
+  gap: 10px;
+  padding: 12px 0 0;
+}
+
+.annBtn {
+  flex: 1;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+  color: #eaf7f1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 750;
+  transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.annBtn:hover {
+  background: rgba(22, 163, 74, 0.10);
+  border-color: rgba(22, 163, 74, 0.16);
+  transform: translateY(-1px);
+}
+
+.annBtn.active {
+  background: rgba(22, 163, 74, 0.18);
+  border-color: rgba(22, 163, 74, 0.24);
+}
+
+/* ====== COMMENTS ====== */
+.annComments {
+  margin-top: 12px;
+}
+
+.annCommentBox {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding-top: 10px;
+}
+
+.annCommentBox input {
+  flex: 1;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(2, 44, 34, 0.35);
+  color: #eaf7f1;
+  outline: none;
+  padding: 0 12px;
+}
+
+.annCommentBox input::placeholder {
+  color: rgba(234, 247, 241, 0.55);
+}
+
+.annCommentBox input:focus {
+  border-color: rgba(34, 197, 94, 0.35);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.10);
+}
+
+/* comment list */
+.annCommentList {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.annComment {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.annComment .avatarSmall {
+  width: 34px;
+  height: 34px;
+  border-radius: 14px;
+}
+
+.annCommentBody {
+  flex: 1;
+}
+
+.annCommentBody strong {
+  font-size: 13px;
+}
+
+.annCommentBody p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  opacity: 0.92;
+}
+
+/* ====== LOAD MORE ====== */
+.annMore {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 0;
+}
+
+/* ====== RESPONSIVE ====== */
+@media (max-width: 1200px) {
+  .annShell {
+    grid-template-columns: 1fr 340px;
+    width: min(1320px, calc(100% - 44px));
+  }
+}
+
+@media (max-width: 1100px) {
+  .annShell {
+    grid-template-columns: 1fr;
+  }
+  .annRight {
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .annShell {
+    width: calc(100% - 28px);
+    padding: 14px 0 36px;
+  }
+
+  .annHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .annActions {
+    flex-direction: column;
+  }
+
+  .annBtn {
+    width: 100%;
+  }
+}

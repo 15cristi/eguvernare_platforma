@@ -1,0 +1,13 @@
+.appLayout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 100vh;
+}
+
+.appLayoutSidebar {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.appLayoutMain {
+  padding: 24px;
+}

@@ -1,13 +1,25 @@
 import "./Profile.css";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getMyProfile, updateMyProfile, saveAvatarUrl } from "../api/profile";
 import { suggestLookup, upsertLookup } from "../api/lookups";
+import type { LookupCategory } from "../api/lookups";
 import { uploadAvatarToCloudinary } from "../api/cloudinary";
-import { AuthContext } from "../context/AuthContext";
 import { SinglePicker } from "../components/SinglePicker";
 
 type Availability = "FULL_TIME" | "PART_TIME" | "WEEKENDS";
 type ExperienceLevel = "JUNIOR" | "MID" | "SENIOR";
+
+interface ExpertiseItem {
+  area: string;
+  description: string;
+}
+
+interface ResourceItem {
+  title: string;
+  description: string;
+  url: string;
+}
 
 interface Profile {
   headline: string;
@@ -15,8 +27,17 @@ interface Profile {
   country: string;
   city: string;
 
+  affiliation: string;
+  profession: string;
+
   faculty: string;
+
+  // legacy kept for compatibility
   expertAreas: string[];
+
+  // new
+  expertise: ExpertiseItem[];
+  resources: ResourceItem[];
 
   companyName: string;
   companyDescription: string;
@@ -26,41 +47,22 @@ interface Profile {
   experienceLevel: ExperienceLevel;
   openToProjects: boolean;
   openToMentoring: boolean;
+
   linkedinUrl: string;
   githubUrl: string;
   website: string;
+
   avatarUrl?: string;
 }
 
-type LookupCategory = "CITY" | "COUNTRY" | "FACULTY" | "EXPERT_AREA" | "COMPANY_DOMAIN";
-
 const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+const suggest = (category: LookupCategory, q: string) => suggestLookup(category, q);
+const upsert = (category: LookupCategory, value: string) => upsertLookup(category, value);
 
-// wrappers ca să nu te blochezi pe union-uri din api/lookups.ts
-const suggest = (category: LookupCategory, q: string) => suggestLookup(category as any, q);
-const upsert = (category: LookupCategory, value: string) => upsertLookup(category as any, value);
-
-const ProfilePage = () => {
-  const { user } = useContext(AuthContext);
-
-  const backendRole = user?.role as
-    | "CITIZEN"
-    | "ENTREPRENEURS"
-    | "MENTORS"
-    | "INVESTORS"
-    | "MANUFACTURERS"
-    | "ADMIN"
-    | undefined;
-
-  const isCompanyRole = backendRole === "ENTREPRENEURS" || backendRole === "MANUFACTURERS";
-
+export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-
-  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
-  const [facultySuggestions, setFacultySuggestions] = useState<string[]>([]);
-  const [countrySuggestions, setCountrySuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     getMyProfile()
@@ -71,8 +73,14 @@ const ProfilePage = () => {
           country: data.country || "",
           city: data.city || "",
 
+          affiliation: data.affiliation || "",
+          profession: data.profession || "",
+
           faculty: data.faculty || "",
+
           expertAreas: data.expertAreas || [],
+          expertise: data.expertise || (data.expertAreas || []).map((a: string) => ({ area: a, description: "" })),
+          resources: data.resources || [],
 
           companyName: data.companyName || "",
           companyDescription: data.companyDescription || "",
@@ -82,9 +90,11 @@ const ProfilePage = () => {
           experienceLevel: data.experienceLevel || "JUNIOR",
           openToProjects: !!data.openToProjects,
           openToMentoring: !!data.openToMentoring,
+
           linkedinUrl: data.linkedinUrl || "",
           githubUrl: data.githubUrl || "",
           website: data.website || "",
+
           avatarUrl: data.avatarUrl
         });
       })
@@ -103,6 +113,8 @@ const ProfilePage = () => {
       p.bio,
       p.country,
       p.city,
+      p.affiliation,
+      p.profession,
       p.faculty,
       p.availability,
       p.experienceLevel,
@@ -112,8 +124,8 @@ const ProfilePage = () => {
       p.githubUrl,
       p.website,
       p.avatarUrl,
-      p.expertAreas,
-      // câmpuri companie (contează, chiar dacă nu sunt vizibile pentru toți)
+      p.expertise,
+      p.resources,
       p.companyName,
       p.companyDescription,
       p.companyDomains
@@ -130,17 +142,40 @@ const ProfilePage = () => {
 
   const strength = calculateProfileStrength(profile);
 
+  const safeUpsert = async (category: LookupCategory, value: string) => {
+    const v = norm(value || "");
+    if (!v) return;
+    try {
+      await upsert(category, v);
+    } catch (e) {
+      console.error("Lookup upsert failed:", category, v, e);
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     try {
+      await Promise.all([
+        safeUpsert("COUNTRY", profile.country),
+        safeUpsert("CITY", profile.city),
+        safeUpsert("FACULTY", profile.faculty),
+        safeUpsert("AFFILIATION", profile.affiliation),
+        safeUpsert("PROFESSION", profile.profession)
+      ]);
+
       const payload = {
         headline: profile.headline,
         bio: profile.bio,
         country: profile.country,
         city: profile.city,
+
+        affiliation: profile.affiliation,
+        profession: profile.profession,
         faculty: profile.faculty,
 
         expertAreas: profile.expertAreas,
+        expertise: profile.expertise,
+        resources: profile.resources,
 
         companyName: profile.companyName,
         companyDescription: profile.companyDescription,
@@ -150,6 +185,7 @@ const ProfilePage = () => {
         experienceLevel: profile.experienceLevel,
         openToProjects: profile.openToProjects,
         openToMentoring: profile.openToMentoring,
+
         linkedinUrl: profile.linkedinUrl,
         githubUrl: profile.githubUrl,
         website: profile.website
@@ -166,51 +202,58 @@ const ProfilePage = () => {
   };
 
   return (
-    <main className="profile-page">
+    <div className="profile-page">
       <header className="profile-header">
         <div>
           <h1>My Profile</h1>
           <p>Update your profile details and preferences.</p>
         </div>
-        <button onClick={save} disabled={saving}>
+
+        <button type="button" onClick={save} disabled={saving}>
           {saving ? "Saving…" : "Save Changes"}
         </button>
       </header>
 
-      <div className="profile-grid">
-        {/* SIDEBAR */}
-        <aside className="profile-sidebar">
-          <div className="sidebar-card">
-            <div
-              className="profile-avatar"
-              style={{
-                backgroundImage: profile.avatarUrl ? `url(${profile.avatarUrl})` : undefined
-              }}
-            >
-              <label className="avatar-overlay">
-                📷
-                <input
-                  type="file"
-                  hidden
-                  accept="image/*"
-                  disabled={uploading}
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
+      {/* OVERVIEW */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <span>🪪</span>
+          <h2>Profile overview</h2>
+          <InfoTip text="Your avatar and a quick profile strength indicator." />
+        </div>
 
-                    setUploading(true);
-                    try {
-                      const url = await uploadAvatarToCloudinary(file);
-                      await saveAvatarUrl(url);
-                      update("avatarUrl", url);
-                    } finally {
-                      setUploading(false);
-                    }
-                  }}
-                />
-              </label>
-            </div>
+        <div className="profile-overview">
+          <div
+            className="profile-avatar"
+            style={{
+              backgroundImage: profile.avatarUrl ? `url(${profile.avatarUrl})` : undefined
+            }}
+          >
+            <label className="avatar-overlay">
+              📷
+              <input
+                type="file"
+                hidden
+                accept="image/*"
+                disabled={uploading}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
 
+                  setUploading(true);
+                  try {
+                    const url = await uploadAvatarToCloudinary(file);
+                    await saveAvatarUrl(url);
+                    update("avatarUrl", url);
+                  } finally {
+                    setUploading(false);
+                  }
+                }}
+              />
+            </label>
+          </div>
+
+          <div className="profile-overview-meta">
             <p className="headline-preview">{profile.headline || "Your professional headline"}</p>
 
             <div className="profile-strength">
@@ -223,173 +266,328 @@ const ProfilePage = () => {
               </div>
             </div>
           </div>
-        </aside>
-
-        {/* CONTENT */}
-        <section className="profile-content">
-          {/* BASIC */}
-          <div className="card">
-            <div className="card-header">
-              <span>🧾</span>
-              <h2>Profile details</h2>
-            </div>
-
-            <label>
-              Headline
-              <input value={profile.headline} onChange={(e) => update("headline", e.target.value)} />
-            </label>
-
-            <label>
-              Bio
-              <textarea value={profile.bio} onChange={(e) => update("bio", e.target.value)} />
-            </label>
-
-            <div className="row">
-              <SinglePicker
-              label="Country"
-              category="COUNTRY"
-              value={profile.country}
-              onChange={(v) => update("country", v)}
-              placeholder="Search or add country"
-            />
-
-            <SinglePicker
-              label="City"
-              category="CITY"
-              value={profile.city}
-              onChange={(v) => update("city", v)}
-              placeholder="Search or add city"
-            />
-
-            </div>
-          </div>
-
-          {/* AVAILABILITY */}
-          <div className="card">
-            <div className="card-header">
-              <span>🧠</span>
-              <h2>Availability</h2>
-            </div>
-
-            <label>
-              Availability
-              <select value={profile.availability} onChange={(e) => update("availability", e.target.value as Availability)}>
-                <option value="FULL_TIME">Full time</option>
-                <option value="PART_TIME">Part time</option>
-                <option value="WEEKENDS">Weekends</option>
-              </select>
-            </label>
-
-            <label>
-              Experience level
-              <select
-                value={profile.experienceLevel}
-                onChange={(e) => update("experienceLevel", e.target.value as ExperienceLevel)}
-              >
-                <option value="JUNIOR">Junior</option>
-                <option value="MID">Mid</option>
-                <option value="SENIOR">Senior</option>
-              </select>
-            </label>
-
-            <div className="checkboxes">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={profile.openToProjects}
-                  onChange={(e) => update("openToProjects", e.target.checked)}
-                />
-                Open to projects
-              </label>
-
-              <label>
-                <input
-                  type="checkbox"
-                  checked={profile.openToMentoring}
-                  onChange={(e) => update("openToMentoring", e.target.checked)}
-                />
-                Open to mentoring
-              </label>
-            </div>
-
-            <SinglePicker
-              label="Faculty"
-              category="FACULTY"
-              value={profile.faculty}
-              onChange={(v) => update("faculty", v)}
-              placeholder="Search or add faculty"
-            />
-          </div>
-
-          {/* EXPERTISE / COMPANY */}
-          <div className="card">
-            <div className="card-header">
-              <span>🧩</span>
-              <h2>{isCompanyRole ? "Company details" : "Expertise"}</h2>
-            </div>
-
-            {isCompanyRole ? (
-              <>
-                <label>
-                  Company name
-                  <input value={profile.companyName} onChange={(e) => update("companyName", e.target.value)} />
-                </label>
-
-                <label>
-                  Company description
-                  <textarea
-                    value={profile.companyDescription}
-                    onChange={(e) => update("companyDescription", e.target.value)}
-                  />
-                </label>
-
-                <TagPicker
-                  label="Domains"
-                  category="COMPANY_DOMAIN"
-                  values={profile.companyDomains || []}
-                  onChange={(vals) => update("companyDomains", vals)}
-                  placeholder="Search or add a domain"
-                />
-              </>
-            ) : (
-              <TagPicker
-                label="Expert Areas"
-                category="EXPERT_AREA"
-                values={profile.expertAreas || []}
-                onChange={(vals) => update("expertAreas", vals)}
-                placeholder="Search or add an expert area"
-              />
-            )}
-          </div>
-
-          {/* LINKS */}
-          <div className="card">
-            <div className="card-header">
-              <span>🔗</span>
-              <h2>External links</h2>
-            </div>
-
-            <label>
-              LinkedIn
-              <input value={profile.linkedinUrl} onChange={(e) => update("linkedinUrl", e.target.value)} />
-            </label>
-
-            <label>
-              GitHub
-              <input value={profile.githubUrl} onChange={(e) => update("githubUrl", e.target.value)} />
-            </label>
-
-            <label>
-              Website
-              <input value={profile.website} onChange={(e) => update("website", e.target.value)} />
-            </label>
-          </div>
-        </section>
+        </div>
       </div>
-    </main>
+
+      {/* DETAILS */}
+      <div className="card">
+        <div className="card-header">
+          <span>🧾</span>
+          <h2>Profile details</h2>
+          <InfoTip text="Basic info shown publicly: headline, bio, location, affiliation, profession and faculty." />
+        </div>
+
+        <label>
+          Headline
+          <input value={profile.headline} onChange={(e) => update("headline", e.target.value)} />
+        </label>
+
+        <label>
+          Bio
+          <textarea value={profile.bio} onChange={(e) => update("bio", e.target.value)} />
+        </label>
+
+        <div className="row">
+          <SinglePicker
+            label="Country"
+            category="COUNTRY"
+            value={profile.country}
+            onChange={(v) => update("country", v)}
+            placeholder="Search or add country"
+          />
+
+          <SinglePicker
+            label="City"
+            category="CITY"
+            value={profile.city}
+            onChange={(v) => update("city", v)}
+            placeholder="Search or add city"
+          />
+        </div>
+
+        <div className="row">
+          <SinglePicker
+            label="Affiliation"
+            category="AFFILIATION"
+            value={profile.affiliation}
+            onChange={(v) => update("affiliation", v)}
+            placeholder="Search or add affiliation"
+          />
+
+          <SinglePicker
+            label="Profession"
+            category="PROFESSION"
+            value={profile.profession}
+            onChange={(v) => update("profession", v)}
+            placeholder="Search or add profession"
+          />
+        </div>
+
+        <SinglePicker
+          label="Faculty"
+          category="FACULTY"
+          value={profile.faculty}
+          onChange={(v) => update("faculty", v)}
+          placeholder="Search or add faculty"
+        />
+      </div>
+
+      {/* COLLABORATION */}
+      <div className="card">
+        <div className="card-header">
+          <span>🤝</span>
+          <h2>Collaboration</h2>
+          <InfoTip text="Availability, experience level and collaboration preferences." />
+        </div>
+
+        <label>
+          Availability
+          <select value={profile.availability} onChange={(e) => update("availability", e.target.value as Availability)}>
+            <option value="FULL_TIME">Full time</option>
+            <option value="PART_TIME">Part time</option>
+            <option value="WEEKENDS">Weekends</option>
+          </select>
+        </label>
+
+        <label>
+          Experience level
+          <select
+            value={profile.experienceLevel}
+            onChange={(e) => update("experienceLevel", e.target.value as ExperienceLevel)}
+          >
+            <option value="JUNIOR">Junior</option>
+            <option value="MID">Mid</option>
+            <option value="SENIOR">Senior</option>
+          </select>
+        </label>
+
+        <div className="toggles">
+          <Toggle label="Open to projects" checked={profile.openToProjects} onChange={(v) => update("openToProjects", v)} />
+          <Toggle label="Open to mentoring" checked={profile.openToMentoring} onChange={(v) => update("openToMentoring", v)} />
+        </div>
+      </div>
+
+      {/* EXPERTISE */}
+      <div className="card">
+        <div className="card-header">
+          <span>🧩</span>
+          <h2>Expertise</h2>
+          <InfoTip text="Add expert areas and a short description so people understand your skills." />
+        </div>
+
+        <ExpertiseEditor
+          items={profile.expertise}
+          onChange={(items) => {
+            update("expertise", items);
+            update(
+              "expertAreas",
+              items.map((i) => i.area).filter(Boolean)
+            );
+          }}
+        />
+      </div>
+
+      {/* RESOURCES */}
+      <div className="card">
+        <div className="card-header">
+          <span>🧪</span>
+          <h2>Labs / Resources</h2>
+          <InfoTip text="Optional links to labs, tools, repositories, papers or datasets." />
+        </div>
+
+        <ResourcesEditor items={profile.resources} onChange={(items) => update("resources", items)} />
+      </div>
+
+      {/* COMPANY */}
+      <div className="card">
+        <div className="card-header">
+          <span>🏢</span>
+          <h2>Company details</h2>
+          <InfoTip text="If relevant, add company info and domains. Otherwise you can leave it blank." />
+        </div>
+
+        <label>
+          Company name
+          <input value={profile.companyName} onChange={(e) => update("companyName", e.target.value)} />
+        </label>
+
+        <label>
+          Company description
+          <textarea value={profile.companyDescription} onChange={(e) => update("companyDescription", e.target.value)} />
+        </label>
+
+        <TagPicker
+          label="Domains"
+          category="COMPANY_DOMAIN"
+          values={profile.companyDomains || []}
+          onChange={(vals) => update("companyDomains", vals)}
+          placeholder="Search or add a domain"
+        />
+      </div>
+
+      {/* LINKS */}
+      <div className="card">
+        <div className="card-header">
+          <span>🔗</span>
+          <h2>External links</h2>
+          <InfoTip text="Add links (LinkedIn, GitHub, website) so others can view your work." />
+        </div>
+
+        <label>
+          LinkedIn
+          <input value={profile.linkedinUrl} onChange={(e) => update("linkedinUrl", e.target.value)} />
+        </label>
+
+        <label>
+          GitHub
+          <input value={profile.githubUrl} onChange={(e) => update("githubUrl", e.target.value)} />
+        </label>
+
+        <label>
+          Website
+          <input value={profile.website} onChange={(e) => update("website", e.target.value)} />
+        </label>
+      </div>
+    </div>
   );
+}
+
+/* ---------- Info tooltip ---------- */
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="infoTip" tabIndex={0}>
+      i
+      <span className="infoTipBubble" role="tooltip">
+        {text}
+      </span>
+    </span>
+  );
+}
+
+/* ---------- Toggle ---------- */
+function Toggle({
+  label,
+  checked,
+  onChange
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="toggleRow">
+      <span className="toggleLabel">{label}</span>
+      <input className="toggleInput" type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span className="toggleTrack" aria-hidden="true">
+        <span className="toggleThumb" />
+      </span>
+    </label>
+  );
+}
+
+/* ---------- Expertise editor ---------- */
+type ExpertiseEditorProps = {
+  items: ExpertiseItem[];
+  onChange: (items: ExpertiseItem[]) => void;
 };
 
+function ExpertiseEditor({ items, onChange }: ExpertiseEditorProps) {
+  const updateItem = (idx: number, patch: Partial<ExpertiseItem>) => {
+    const next = items.map((it, i) => (i === idx ? { ...it, ...patch } : it));
+    onChange(next);
+  };
+
+  const add = () => onChange([...(items || []), { area: "", description: "" }]);
+  const remove = (idx: number) => onChange(items.filter((_, i) => i !== idx));
+
+  return (
+    <div>
+      {items.length === 0 && <small className="hint">Add at least one area so others can find you.</small>}
+
+      {items.map((it, idx) => (
+        <div key={`${it.area}-${idx}`} className="subcard">
+          <SinglePicker
+            label="Expert area"
+            category="EXPERT_AREA"
+            value={it.area}
+            onChange={(v) => updateItem(idx, { area: v })}
+            placeholder="Search or add an expert area"
+          />
+
+          <label>
+            Description
+            <textarea value={it.description || ""} onChange={(e) => updateItem(idx, { description: e.target.value })} />
+          </label>
+
+          <div className="actionsRow">
+            <button type="button" className="btnDanger" onClick={() => remove(idx)}>
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+
+      <button type="button" className="btnSecondary" onClick={add} style={{ marginTop: 12 }}>
+        + Add expertise
+      </button>
+    </div>
+  );
+}
+
+/* ---------- Resources editor ---------- */
+type ResourcesEditorProps = {
+  items: ResourceItem[];
+  onChange: (items: ResourceItem[]) => void;
+};
+
+function ResourcesEditor({ items, onChange }: ResourcesEditorProps) {
+  const updateItem = (idx: number, patch: Partial<ResourceItem>) => {
+    const next = items.map((it, i) => (i === idx ? { ...it, ...patch } : it));
+    onChange(next);
+  };
+
+  const add = () => onChange([...(items || []), { title: "", description: "", url: "" }]);
+  const remove = (idx: number) => onChange(items.filter((_, i) => i !== idx));
+
+  return (
+    <div>
+      {items.length === 0 && <small className="hint">Optional: add links to labs, tools, papers, or repositories.</small>}
+
+      {items.map((it, idx) => (
+        <div key={`${it.title}-${idx}`} className="subcard">
+          <div className="row">
+            <label>
+              Title
+              <input value={it.title || ""} onChange={(e) => updateItem(idx, { title: e.target.value })} />
+            </label>
+
+            <label>
+              URL
+              <input value={it.url || ""} onChange={(e) => updateItem(idx, { url: e.target.value })} />
+            </label>
+          </div>
+
+          <label>
+            Description
+            <textarea value={it.description || ""} onChange={(e) => updateItem(idx, { description: e.target.value })} />
+          </label>
+
+          <div className="actionsRow">
+            <button type="button" className="btnDanger" onClick={() => remove(idx)}>
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+
+      <button type="button" className="btnSecondary" onClick={add} style={{ marginTop: 12 }}>
+        + Add resource
+      </button>
+    </div>
+  );
+}
+
+/* ---------- TagPicker ---------- */
 type TagPickerProps = {
   label: string;
   category: LookupCategory;
@@ -410,6 +608,7 @@ function TagPicker({ label, category, values, onChange, placeholder }: TagPicker
     const q = input.trim();
     if (!q) {
       setSuggestions([]);
+      setOpen(false);
       return;
     }
 
@@ -419,8 +618,10 @@ function TagPicker({ label, category, values, onChange, placeholder }: TagPicker
         const filtered = items.filter((i: string) => !selected.has(i.toLowerCase()));
         setSuggestions(filtered.slice(0, 10));
         setOpen(true);
-      } catch {
+      } catch (e) {
+        console.error("Lookup suggest failed:", category, input, e);
         setSuggestions([]);
+        setOpen(false);
       }
     }, 200);
 
@@ -450,8 +651,8 @@ function TagPicker({ label, category, values, onChange, placeholder }: TagPicker
 
     try {
       await upsert(category, v);
-    } catch {
-      // ok, UI-ul merge oricum
+    } catch (e) {
+      console.error("Lookup upsert failed:", category, v, e);
     }
 
     setInput("");
@@ -511,9 +712,7 @@ function TagPicker({ label, category, values, onChange, placeholder }: TagPicker
         )}
       </div>
 
-      <small className="hint">Enter pentru a adăuga dacă nu există în listă.</small>
+      <small className="hint">Press Enter to add if it is not in the list.</small>
     </div>
   );
 }
-
-export default ProfilePage;

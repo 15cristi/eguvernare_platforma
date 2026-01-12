@@ -1,0 +1,13 @@
+.protectedLayout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 100vh;
+}
+
+.protectedSidebar {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.protectedMain {
+  padding: 24px;
+}

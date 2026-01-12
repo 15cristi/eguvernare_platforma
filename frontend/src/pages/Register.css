@@ -174,3 +174,54 @@
 .suggestion:hover {
   background: #0c3b31;
 }
+.subcard {
+  background: #062e25;
+  border: 1px solid #164e41;
+  border-radius: 14px;
+  padding: 18px;
+  margin-top: 12px;
+}
+
+.actionsRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.btnDanger {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #ffd6d6;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btnDanger:hover {
+  background: rgba(239, 68, 68, 0.22);
+}
+
+.btnSecondary {
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #e6f4ef;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.btnSecondary:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.profile-overview {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.profile-overview-meta {
+  flex: 1;
+}

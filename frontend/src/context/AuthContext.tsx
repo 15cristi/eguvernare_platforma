@@ -5,6 +5,7 @@ export interface User {
   lastName: string;
   role: string;
   email: string;
+  avatarUrl?: string;
 }
 
 interface AuthContextType {

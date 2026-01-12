@@ -2,9 +2,13 @@ import api from "./axios";
 
 export type LookupCategory =
   | "CITY"
+  | "COUNTRY"
   | "FACULTY"
   | "EXPERT_AREA"
-  | "COMPANY_DOMAIN";
+  | "COMPANY_DOMAIN"
+  | "AFFILIATION"
+  | "PROFESSION";
+
 
 
 export const suggestLookup = async (

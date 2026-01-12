@@ -4,43 +4,22 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import AdminLookupsUpload from "./pages/AdminLookupsUpload";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedLayout from "./layouts/ProtectedLayout";
+import Announcements from "./pages/Announcements";
 
 function App() {
   return (
     <Routes>
-      {/* PUBLIC */}
       <Route path="/" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      {/* PROTECTED */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
+      <Route element={<ProtectedLayout />}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/admin/lookups-upload" element={<AdminLookupsUpload />} />
+        <Route path="/announcements" element={<Announcements />} />
 
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* ADMIN */}
-      <Route
-        path="/admin/lookups-upload"
-        element={
-          <ProtectedRoute>
-            <AdminLookupsUpload />
-          </ProtectedRoute>
-        }
-      />
+      </Route>
     </Routes>
   );
 }

@@ -5,16 +5,19 @@
 }
 
 html,
-body,
-#root {
+body {
   margin: 0;
   padding: 0;
-  width: 100%;
   height: 100%;
+  font-family: "Inter", system-ui, sans-serif;
+  background: #041f14;
+  color: #eaf7f1;
+
+  /* foarte important: pagina NU scrollează */
+  overflow: hidden;
 }
 
-body {
-  font-family: "Inter", system-ui, sans-serif;
-  background: #022c22;
-  color: white;
+#root {
+  height: 100%;
+  width: 100%;
 }

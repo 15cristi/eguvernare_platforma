@@ -8,9 +8,18 @@ export interface ProfileUpdatePayload {
   bio?: string;
   country?: string;
   city?: string;
+
+  affiliation?: string;
+  profession?: string;
+  university?: string;
+
   faculty?: string;
 
   expertAreas?: string[];
+
+  expertise?: { area: string; description: string }[];
+
+  resources?: { title: string; description: string; url: string }[];
 
   companyName?: string;
   companyDescription?: string;

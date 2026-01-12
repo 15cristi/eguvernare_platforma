@@ -1,60 +1,28 @@
 import { useEffect, useRef, useState } from "react";
-
-type LookupCategory = "CITY" | "COUNTRY" | "FACULTY" | "EXPERT_AREA" | "COMPANY_DOMAIN";
-
-const norm = (s: string) => s.trim().replace(/\s+/g, " ");
-
-// aici folosim exact wrapper-ele tale din Profile.tsx
-// dacă le ții în Profile.tsx, mută-le într-un fișier comun (ex: src/utils/lookups.ts)
 import { suggestLookup, upsertLookup } from "../api/lookups";
+import type { LookupCategory } from "../api/lookups";
 
-const suggest = (category: LookupCategory, q: string) => suggestLookup(category as any, q);
-const upsert = (category: LookupCategory, value: string) => upsertLookup(category as any, value);
-
-type SinglePickerProps = {
+type Props = {
   label: string;
   category: LookupCategory;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (v: string) => void;
   placeholder?: string;
 };
 
-export function SinglePicker({
-  label,
-  category,
-  value,
-  onChange,
-  placeholder
-}: SinglePickerProps) {
-  const [input, setInput] = useState(value || "");
+const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+
+export function SinglePicker({ label, category, value, onChange, placeholder }: Props) {
+  const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+
   const boxRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // ține input sincron cu value când se încarcă profilul
-  useEffect(() => {
-    setInput(value || "");
-  }, [value]);
-
-  useEffect(() => {
-    const q = input.trim();
-    if (!q) {
-      setSuggestions([]);
-      return;
-    }
-
-    const t = window.setTimeout(async () => {
-      try {
-        const list = await suggest(category, q);
-        setSuggestions(list.slice(0, 10));
-        setOpen(true);
-      } catch {
-        setSuggestions([]);
-      }
-    }, 200);
-
-    return () => window.clearTimeout(t);
-  }, [input, category]);
+  // valoarea "selectată" înainte de editare (ca să nu se schimbe în timp ce tastezi)
+  const selectedAtFocusRef = useRef<string>("");
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -65,6 +33,48 @@ export function SinglePicker({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
+  useEffect(() => {
+    if (!focused) {
+      setSuggestions([]);
+      setOpen(false);
+      return;
+    }
+
+    const q = norm(query);
+
+    if (!q) {
+      setSuggestions([]);
+      setOpen(false);
+      return;
+    }
+
+    // IMPORTANT: comparăm cu valoarea existentă la momentul focus-ului, nu cu value live
+    const selected = (selectedAtFocusRef.current || "").toLowerCase();
+    if (selected && q.toLowerCase() === selected) {
+      setSuggestions([]);
+      setOpen(false);
+      return;
+    }
+
+    const t = window.setTimeout(async () => {
+      try {
+        const items: string[] = await suggestLookup(category, q);
+
+        // scoate valoarea selectată inițial (nu "value" live, care se schimbă pe măsură ce tastezi)
+        const filtered = items.filter((s) => s.toLowerCase() !== selected);
+
+        setSuggestions(filtered.slice(0, 10));
+        setOpen(filtered.length > 0);
+      } catch (e) {
+        console.error("Lookup suggest failed:", category, q, e);
+        setSuggestions([]);
+        setOpen(false);
+      }
+    }, 200);
+
+    return () => window.clearTimeout(t);
+  }, [query, focused, category]);
+
   const commit = async (raw: string) => {
     const v = norm(raw);
     if (!v) return;
@@ -72,11 +82,22 @@ export function SinglePicker({
     onChange(v);
 
     try {
-      await upsert(category, v);
-    } catch {}
+      await upsertLookup(category, v);
+    } catch (e) {
+      console.error("Lookup upsert failed:", category, v, e);
+    }
 
+    // după commit, asta devine valoarea "selectată"
+    selectedAtFocusRef.current = v;
+
+    setQuery(v);
+    setSuggestions([]);
     setOpen(false);
+
+    window.setTimeout(() => inputRef.current?.select(), 0);
   };
+
+  const displayValue = focused ? query : value || "";
 
   return (
     <div className="tagpicker" ref={boxRef}>
@@ -84,20 +105,34 @@ export function SinglePicker({
 
       <div className="tagpicker-inputwrap">
         <input
-          value={input}
-          placeholder={placeholder}
-          onChange={(e) => {
-            setInput(e.target.value);
-            onChange(e.target.value);
+          ref={inputRef}
+          value={displayValue}
+          placeholder={placeholder || "Search or add..."}
+          onFocus={() => {
+            setFocused(true);
+            selectedAtFocusRef.current = value || "";
+            setQuery(value || "");
+            setOpen(false);
           }}
-          onFocus={() => input.trim() && setOpen(true)}
-          onBlur={() => commit(input)}
+          onBlur={() => {
+            setFocused(false);
+            setQuery("");
+            setOpen(false);
+          }}
+          onChange={(e) => {
+            const next = e.target.value;
+            setQuery(next);
+            onChange(next); // permite Save fără Enter
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              commit(input);
+              commit(query);
             }
-            if (e.key === "Escape") setOpen(false);
+            if (e.key === "Escape") {
+              setOpen(false);
+              setQuery(value || "");
+            }
           }}
         />
 
@@ -109,7 +144,6 @@ export function SinglePicker({
                 className="suggestion"
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  setInput(s);
                   commit(s);
                 }}
               >
@@ -120,7 +154,7 @@ export function SinglePicker({
         )}
       </div>
 
-      <small className="hint">Enter pentru a adăuga dacă nu există.</small>
+      <small className="hint">Press Enter to add if it is not in the list.</small>
     </div>
   );
 }

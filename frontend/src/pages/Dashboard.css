@@ -1,21 +1,24 @@
 .dashboard-layout {
   display: flex;
-  height: 100vh;
+  height: 100%;              
   background: #041f14;
   color: #eaf7f1;
   font-family: Inter, sans-serif;
 }
-
 /* SIDEBAR */
 .sidebar {
   width: 280px;
   background: rgba(2, 44, 34, 0.9);
-  border-right: 1px solid rgba(255,255,255,0.08);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   padding: 22px 16px;
   backdrop-filter: blur(8px);
+
+  /* FIX: sidebar fix, scroll intern doar dacă e nevoie */
+  height: 100vh;
+  overflow: hidden;
 }
 
 .brand {
@@ -23,7 +26,7 @@
   gap: 12px;
   align-items: center;
   padding: 10px 10px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   margin-bottom: 14px;
 }
 
@@ -51,8 +54,14 @@
   flex-direction: column;
   gap: 6px;
   padding: 10px 6px;
+
+  /* FIX: scroll doar în nav dacă nu încape */
   overflow-y: auto;
-  max-height: calc(100vh - 280px);
+  overflow-x: hidden;
+
+  /* IMPORTANT: ca să nu depindă de magic numbers */
+  flex: 1;
+  min-height: 0;
 }
 
 .nav-section {
@@ -116,14 +125,14 @@
   font-size: 11px;
   padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   opacity: 0.85;
 }
 
 .sidebar-bottom {
   padding: 12px 6px 6px;
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -133,8 +142,8 @@
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 16px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   gap: 10px;
   align-items: center;
@@ -159,24 +168,34 @@
   opacity: 0.7;
 }
 
-/* MAIN */
+
 .dashboard-main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+
+  
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
+
 
 /* TOPBAR */
 .topbar {
   height: 70px;
   background: rgba(2, 44, 34, 0.55);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 28px;
   backdrop-filter: blur(8px);
+
+  /* opțional: sticky topbar */
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 
 .topbar-left {
@@ -213,7 +232,7 @@
   width: 100%;
   height: 42px;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 0 14px 0 36px;
   background: rgba(6, 95, 70, 0.55);
   color: white;
@@ -234,20 +253,21 @@
   width: 42px;
   height: 42px;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
   color: white;
   cursor: pointer;
 }
 
 .icon-btn:hover {
-  background: rgba(255,255,255,0.10);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* CONTENT */
 .content {
+  /* FIX: nu mai face el scroll separat, main face scroll */
   flex: 1;
-  overflow-y: auto;
+  overflow: visible;
   padding: 34px 28px;
 }
 
@@ -279,10 +299,10 @@
 
 .card {
   background: rgba(6, 78, 59, 0.6);
-  border: 1px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 22px;
   border-radius: 20px;
-  box-shadow: 0 14px 40px rgba(0,0,0,0.20);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.2);
 }
 
 .card.stat strong {
@@ -321,8 +341,8 @@
 }
 
 .btn-outline {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: white;
   padding: 8px 14px;
   border-radius: 14px;
@@ -330,7 +350,7 @@
 }
 
 .btn-outline:hover {
-  background: rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* SUGGESTIONS */
@@ -342,19 +362,19 @@
 
 .suggestion-card {
   background: rgba(6, 78, 59, 0.55);
-  border: 1px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
   padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 14px 40px rgba(0,0,0,0.18);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
 .suggestion-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(34, 197, 94, 0.20);
+  border-color: rgba(34, 197, 94, 0.2);
 }
 
 .suggestion-head {
@@ -378,8 +398,8 @@
   font-size: 11px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   opacity: 0.9;
 }
 
