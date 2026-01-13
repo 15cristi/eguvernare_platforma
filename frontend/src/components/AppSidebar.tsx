@@ -57,14 +57,15 @@ export default function AppSidebar() {
 
           <div className="nav-section">Explore</div>
 
-          <button className="nav-item ghost" type="button">
+          <NavLink to="/projects" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
             <span className="nav-ico">📁</span>
             Projects
-          </button>
-          <button className="nav-item ghost" type="button">
+          </NavLink>
+
+          <NavLink to="/publications" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
             <span className="nav-ico">📚</span>
             Publications
-          </button>
+          </NavLink>
 
           <NavLink to="/announcements" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
             <span className="nav-ico">📣</span>
@@ -104,7 +105,7 @@ export default function AppSidebar() {
                 ? {
                     backgroundImage: `url(${avatarUrl})`,
                     backgroundSize: "cover",
-                    backgroundPosition: "center",
+                    backgroundPosition: "center"
                   }
                 : undefined
             }

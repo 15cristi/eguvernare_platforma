@@ -6,7 +6,8 @@ import Profile from "./pages/Profile";
 import AdminLookupsUpload from "./pages/AdminLookupsUpload";
 import ProtectedLayout from "./layouts/ProtectedLayout";
 import Announcements from "./pages/Announcements";
-
+import Projects from "./pages/Projects";
+import Publications from "./pages/Publications";
 function App() {
   return (
     <Routes>
@@ -18,7 +19,8 @@ function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/admin/lookups-upload" element={<AdminLookupsUpload />} />
         <Route path="/announcements" element={<Announcements />} />
-
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/publications" element={<Publications />} />
       </Route>
     </Routes>
   );

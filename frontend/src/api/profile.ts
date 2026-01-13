@@ -39,6 +39,11 @@ export const getMyProfile = async () => {
   return res.data;
 };
 
+export const getProfileByUserId = async (userId: number) => {
+  const res = await api.get(`/api/profile/${userId}`);
+  return res.data;
+};
+
 export const updateMyProfile = async (profile: ProfileUpdatePayload) => {
   const res = await api.put("/api/profile/me", profile);
   return res.data;

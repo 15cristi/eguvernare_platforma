@@ -45,8 +45,8 @@
 .annSideStat {
   padding: 12px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .annSideStat strong {
@@ -60,32 +60,6 @@
   font-size: 12px;
   opacity: 0.7;
   line-height: 1.4;
-}
-
-.annTrendList {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 6px;
-}
-
-.annTrendItem {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 10px 10px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.annTrendDot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(34, 197, 94, 0.75);
-  margin-top: 5px;
-  box-shadow: 0 10px 25px rgba(34, 197, 94, 0.18);
 }
 
 /* ====== HEADER ====== */
@@ -110,18 +84,18 @@
   opacity: 0.72;
 }
 
-/* ====== BASE CARD ====== */
+/* ====== BASE CARD (MAI SOLID) ====== */
 .card {
-  background: rgba(6, 78, 59, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(6, 78, 59, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 22px;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
 }
 
 /* ====== BUTTONS ====== */
 .btn-outline {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   color: #eaf7f1;
   padding: 10px 14px;
   border-radius: 14px;
@@ -129,7 +103,7 @@
 }
 
 .btn-outline:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.10);
 }
 
 .btn-primary {
@@ -156,10 +130,10 @@
 .annComposer textarea {
   width: 100%;
   resize: vertical;
-  min-height: 170px; /* mai mare ca înainte */
+  min-height: 170px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(2, 44, 34, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(2, 44, 34, 0.55);
   color: #eaf7f1;
   outline: none;
   padding: 14px 14px;
@@ -172,8 +146,8 @@
 }
 
 .annComposer textarea:focus {
-  border-color: rgba(34, 197, 94, 0.35);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.45);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
 }
 
 .annComposerBar {
@@ -203,8 +177,8 @@
   margin-top: 12px;
   border-radius: 18px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(2, 44, 34, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(2, 44, 34, 0.55);
 }
 
 .annImagePreview img {
@@ -220,14 +194,14 @@
   height: 46px;
   border: none;
   cursor: pointer;
-  background: rgba(248, 113, 113, 0.10);
+  background: rgba(248, 113, 113, 0.14);
   color: #fecaca;
   font-weight: 800;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .annRemoveImage:hover {
-  background: rgba(248, 113, 113, 0.14);
+  background: rgba(248, 113, 113, 0.18);
 }
 
 /* ====== FEED ====== */
@@ -257,13 +231,40 @@
   gap: 12px;
 }
 
+.annAuthorBtn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.annAuthorBtn:hover strong {
+  text-decoration: underline;
+}
+
+.annInlineLink {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+}
+
+.annInlineLink:hover {
+  text-decoration: underline;
+}
+
 .avatarSmall {
   width: 44px;
   height: 44px;
   border-radius: 18px;
-  background: rgba(22, 163, 74, 0.25);
-  border: 1px solid rgba(22, 163, 74, 0.18);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  background: rgba(22, 163, 74, 0.30);
+  border: 1px solid rgba(22, 163, 74, 0.22);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
 }
 
 .annAuthor strong {
@@ -285,13 +286,13 @@
   padding: 4px 0 10px;
 }
 
-/* ====== POST IMAGE (se vede bine, mare) ====== */
+/* ====== POST IMAGE ====== */
 .annPostImage {
   margin-top: 10px;
   border-radius: 18px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(2, 44, 34, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(2, 44, 34, 0.55);
 }
 
 .annPostImage img {
@@ -307,9 +308,9 @@
   display: flex;
   gap: 14px;
   font-size: 12px;
-  opacity: 0.75;
+  opacity: 0.78;
   padding: 10px 0 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 /* ====== ACTIONS ====== */
@@ -323,8 +324,8 @@
   flex: 1;
   height: 44px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
   color: #eaf7f1;
   cursor: pointer;
   display: inline-flex;
@@ -336,14 +337,14 @@
 }
 
 .annBtn:hover {
-  background: rgba(22, 163, 74, 0.10);
-  border-color: rgba(22, 163, 74, 0.16);
+  background: rgba(22, 163, 74, 0.14);
+  border-color: rgba(22, 163, 74, 0.20);
   transform: translateY(-1px);
 }
 
 .annBtn.active {
-  background: rgba(22, 163, 74, 0.18);
-  border-color: rgba(22, 163, 74, 0.24);
+  background: rgba(22, 163, 74, 0.22);
+  border-color: rgba(22, 163, 74, 0.30);
 }
 
 /* ====== COMMENTS ====== */
@@ -362,8 +363,8 @@
   flex: 1;
   height: 44px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(2, 44, 34, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(2, 44, 34, 0.55);
   color: #eaf7f1;
   outline: none;
   padding: 0 12px;
@@ -374,11 +375,10 @@
 }
 
 .annCommentBox input:focus {
-  border-color: rgba(34, 197, 94, 0.35);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.10);
+  border-color: rgba(34, 197, 94, 0.45);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
 }
 
-/* comment list */
 .annCommentList {
   margin-top: 12px;
   display: flex;
@@ -392,8 +392,8 @@
   align-items: flex-start;
   padding: 12px 12px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .annComment .avatarSmall {
@@ -459,4 +459,142 @@
   .annBtn {
     width: 100%;
   }
+}
+
+/* ====== PROFILE MODAL (MAI SOLID) ====== */
+.annModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.70);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+}
+
+.annModal {
+  width: min(820px, 100%);
+  max-height: calc(100vh - 44px);
+  overflow: auto;
+  padding: 18px;
+  background: rgba(6, 78, 59, 0.96);
+}
+
+.annModalHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.annModalTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.annModalTitle h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.annModalAvatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 22px;
+  background: rgba(22, 163, 74, 0.30);
+  border: 1px solid rgba(22, 163, 74, 0.22);
+  background-size: cover;
+  background-position: center;
+}
+
+.annModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.annHeadline {
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.annBio {
+  white-space: pre-wrap;
+  line-height: 1.55;
+  opacity: 0.95;
+}
+
+.annGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.annSection {
+  margin-top: 4px;
+}
+
+.annSectionTitle {
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.annList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.annListItem {
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.annListTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.annPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.annPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 750;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #eaf7f1;
+  text-decoration: none;
+}
+
+.annPill:hover {
+  background: rgba(22, 163, 74, 0.16);
+  border-color: rgba(22, 163, 74, 0.22);
+}
+
+.annError {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(248, 113, 113, 0.16);
+  border: 1px solid rgba(248, 113, 113, 0.26);
+  color: #fecaca;
+  font-weight: 750;
 }

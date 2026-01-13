@@ -8,6 +8,37 @@ import {
   type PostDto
 } from "../api/announcements";
 import { uploadAvatarToCloudinary } from "../api/cloudinary";
+import { getProfileByUserId } from "../api/profile";
+
+type PublicProfile = {
+  headline?: string;
+  bio?: string;
+  country?: string;
+  city?: string;
+
+  affiliation?: string;
+  profession?: string;
+  university?: string;
+  faculty?: string;
+
+  expertAreas?: string[];
+  expertise?: { area: string; description: string }[];
+  resources?: { title: string; description: string; url: string }[];
+
+  companyName?: string;
+  companyDescription?: string;
+  companyDomains?: string[];
+
+  openToProjects?: boolean;
+  openToMentoring?: boolean;
+  availability?: string;
+  experienceLevel?: string;
+
+  linkedinUrl?: string;
+  githubUrl?: string;
+  website?: string;
+  avatarUrl?: string;
+};
 
 export default function Announcements() {
   const [posts, setPosts] = useState<PostDto[]>([]);
@@ -25,8 +56,42 @@ export default function Announcements() {
 
   const [busyPostId, setBusyPostId] = useState<number | null>(null);
 
+  const [profileUser, setProfileUser] = useState<{ id: number; name: string; role: string } | null>(null);
+  const [profileData, setProfileData] = useState<PublicProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string>("");
+  const profileCache = useRef(new Map<number, PublicProfile>());
+
   const fileRef = useRef<HTMLInputElement | null>(null);
   const loadingRef = useRef(false);
+
+  const openProfile = async (userId: number, name: string, role: string) => {
+    setProfileUser({ id: userId, name, role });
+    const cached = profileCache.current.get(userId) || null;
+    setProfileData(cached);
+
+    setProfileError("");
+    setProfileLoading(true);
+
+    try {
+      const data = (await getProfileByUserId(userId)) as PublicProfile;
+      profileCache.current.set(userId, data);
+      setProfileData(data);
+    } catch (e) {
+      console.error(e);
+      setProfileData(null);
+      setProfileError("Could not load profile.");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const closeProfile = () => {
+    setProfileUser(null);
+    setProfileData(null);
+    setProfileLoading(false);
+    setProfileError("");
+  };
 
   const loadPage = async (nextPage: number, mode: "replace" | "append") => {
     if (loadingRef.current) return;
@@ -57,12 +122,20 @@ export default function Announcements() {
 
   useEffect(() => {
     loadPage(0, "replace");
-    // cleanup preview URL
     return () => {
       if (imagePreview) URL.revokeObjectURL(imagePreview);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!profileUser) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeProfile();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [profileUser]);
 
   const refresh = async () => {
     await loadPage(0, "replace");
@@ -129,7 +202,6 @@ export default function Announcements() {
     if (busyPostId) return;
     setBusyPostId(postId);
 
-    // optimistic
     setPosts((prev) =>
       prev.map((p) => {
         if (p.id !== postId) return p;
@@ -167,14 +239,12 @@ export default function Announcements() {
     }
   };
 
-  // right sidebar stats (cheap + useful)
   const totalPosts = posts.length;
   const totalLikes = posts.reduce((sum, p) => sum + (p.likeCount || 0), 0);
   const totalComments = posts.reduce((sum, p) => sum + (p.commentCount || 0), 0);
 
   return (
     <div className="annShell">
-      {/* FEED COLUMN */}
       <div className="annPage">
         <div className="annHeader">
           <div>
@@ -187,7 +257,6 @@ export default function Announcements() {
           </button>
         </div>
 
-        {/* COMPOSER */}
         <div className="annComposer card">
           <textarea
             value={draft}
@@ -198,7 +267,6 @@ export default function Announcements() {
 
           {imagePreview && (
             <div className="annImagePreview">
-              {/* preview: cover + safe background */}
               <img src={imagePreview} alt="preview" />
               <button className="annRemoveImage" type="button" onClick={clearImage} title="Remove image">
                 Remove
@@ -240,7 +308,6 @@ export default function Announcements() {
           </div>
         </div>
 
-        {/* FEED */}
         <div className="annFeed">
           {posts.map((p) => (
             <PostCard
@@ -249,6 +316,7 @@ export default function Announcements() {
               busy={busyPostId === p.id}
               onLike={() => onToggleLike(p.id)}
               onComment={(text) => onAddComment(p.id, text)}
+              onOpenProfile={(u) => openProfile(u.id, `${u.firstName} ${u.lastName}`, u.role)}
             />
           ))}
 
@@ -265,7 +333,6 @@ export default function Announcements() {
         </div>
       </div>
 
-      {/* RIGHT SIDEBAR */}
       <aside className="annRight">
         <div className="card annSideCard">
           <div className="annSideTitle">
@@ -288,13 +355,19 @@ export default function Announcements() {
             </div>
           </div>
 
-          <div className="annSideHint muted">
-            Tip: photo posts look better if the image is at least 1200px wide.
-          </div>
+          <div className="annSideHint muted">Tip: photo posts look better if the image is at least 1200px wide.</div>
         </div>
-
-       
       </aside>
+
+      {profileUser && (
+        <ProfileModal
+          user={profileUser}
+          loading={profileLoading}
+          error={profileError}
+          profile={profileData}
+          onClose={closeProfile}
+        />
+      )}
     </div>
   );
 }
@@ -303,12 +376,14 @@ function PostCard({
   post,
   busy,
   onLike,
-  onComment
+  onComment,
+  onOpenProfile
 }: {
   post: PostDto;
   busy: boolean;
   onLike: () => void;
   onComment: (text: string) => void;
+  onOpenProfile: (u: PostDto["author"]) => void;
 }) {
   const [c, setC] = useState("");
 
@@ -322,7 +397,7 @@ function PostCard({
   return (
     <div className="card annPost">
       <div className="annPostHead">
-        <div className="annAuthor">
+        <button className="annAuthor annAuthorBtn" type="button" onClick={() => onOpenProfile(post.author)}>
           <div className="avatarSmall" />
           <div>
             <strong>
@@ -330,7 +405,7 @@ function PostCard({
             </strong>
             <div className="muted">{post.author.role}</div>
           </div>
-        </div>
+        </button>
 
         <div className="muted">{new Date(post.createdAt).toLocaleString()}</div>
       </div>
@@ -339,8 +414,6 @@ function PostCard({
 
       {post.imageUrl ? (
         <div className="annPostImage">
-          {/* object-fit cover is handled in CSS.
-              If your image is small or PNG with transparency, background helps. */}
           <img src={post.imageUrl} alt="post" loading="lazy" />
         </div>
       ) : null}
@@ -397,14 +470,220 @@ function PostCard({
                 <div className="annComment" key={cm.id}>
                   <div className="avatarSmall" />
                   <div className="annCommentBody">
-                    <strong>
-                      {cm.author.firstName} {cm.author.lastName}
-                    </strong>
+                    <button
+                      className="annInlineLink"
+                      type="button"
+                      onClick={() => onOpenProfile(cm.author)}
+                      title="View profile"
+                    >
+                      <strong>
+                        {cm.author.firstName} {cm.author.lastName}
+                      </strong>
+                    </button>
                     <div className="muted">{new Date(cm.createdAt).toLocaleString()}</div>
                     <p>{cm.content}</p>
                   </div>
                 </div>
               ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProfileModal({
+  user,
+  loading,
+  error,
+  profile,
+  onClose
+}: {
+  user: { id: number; name: string; role: string } | null;
+  loading: boolean;
+  error: string;
+  profile: PublicProfile | null;
+  onClose: () => void;
+}) {
+  const p = profile;
+  const title = user?.name || "Profile";
+
+  const loc = [p?.city, p?.country].filter(Boolean).join(", ");
+  const expertise = (p?.expertise && p.expertise.length > 0 ? p.expertise : null) || null;
+  const fallbackAreas =
+    !expertise && p?.expertAreas?.length ? p.expertAreas.map((a) => ({ area: a, description: "" })) : [];
+  const finalExpertise = expertise || fallbackAreas;
+
+  const prettyEnum = (v?: string) => {
+    const s = (v || "").trim();
+    if (!s) return "";
+    return s
+      .replaceAll("_", " ")
+      .toLowerCase()
+      .replace(/(^|\s)\S/g, (t) => t.toUpperCase());
+  };
+
+  const showLink = (label: string, url?: string) => {
+    const v = (url || "").trim();
+    if (!v) return null;
+    const href = v.startsWith("http") ? v : `https://${v}`;
+    return (
+      <a className="annPill" href={href} target="_blank" rel="noreferrer">
+        {label}
+      </a>
+    );
+  };
+
+  return (
+    <div
+      className="annModalOverlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="annModal card" role="dialog" aria-modal="true">
+        <div className="annModalHead">
+          <div className="annModalTitle">
+            <div className="annModalAvatar" style={p?.avatarUrl ? { backgroundImage: `url(${p.avatarUrl})` } : undefined} />
+            <div>
+              <h3>{title}</h3>
+              <div className="muted">{user?.role}</div>
+            </div>
+          </div>
+          <button className="btn-outline" type="button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        {loading && <div className="muted">Loading…</div>}
+        {error && <div className="annError">{error}</div>}
+
+        {!loading && !error && p && (
+          <div className="annModalBody">
+            {p.headline?.trim() ? <div className="annHeadline">{p.headline}</div> : null}
+            {loc ? <div className="muted">{loc}</div> : null}
+
+            {p.bio?.trim() ? <div className="annBio">{p.bio}</div> : null}
+
+            <div className="annGrid">
+              {p.affiliation?.trim() ? (
+                <div>
+                  <div className="muted">Affiliation</div>
+                  <div>{p.affiliation}</div>
+                </div>
+              ) : null}
+
+              {p.profession?.trim() ? (
+                <div>
+                  <div className="muted">Profession</div>
+                  <div>{p.profession}</div>
+                </div>
+              ) : null}
+
+              {p.faculty?.trim() ? (
+                <div>
+                  <div className="muted">Faculty</div>
+                  <div>{p.faculty}</div>
+                </div>
+              ) : null}
+
+              {p.university?.trim() ? (
+                <div>
+                  <div className="muted">University</div>
+                  <div>{p.university}</div>
+                </div>
+              ) : null}
+            </div>
+
+            {(p.openToProjects || p.openToMentoring || p.availability?.trim() || p.experienceLevel?.trim()) && (
+              <div className="annSection">
+                <div className="annSectionTitle">Collaborations</div>
+                <div className="annPills">
+                  {p.openToProjects ? <span className="annPill">Open to projects</span> : null}
+                  {p.openToMentoring ? <span className="annPill">Open to mentoring</span> : null}
+                  {p.availability?.trim() ? <span className="annPill">{prettyEnum(p.availability)}</span> : null}
+                  {p.experienceLevel?.trim() ? <span className="annPill">{prettyEnum(p.experienceLevel)}</span> : null}
+                </div>
+              </div>
+            )}
+
+            {finalExpertise?.length ? (
+              <div className="annSection">
+                <div className="annSectionTitle">Expertise</div>
+                <div className="annList">
+                  {finalExpertise.map((x, idx) => (
+                    <div className="annListItem" key={`${x.area}-${idx}`}>
+                      <div className="annListTop">
+                        <strong>{x.area}</strong>
+                      </div>
+                      {x.description?.trim() ? <div className="muted">{x.description}</div> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {p.resources?.length ? (
+              <div className="annSection">
+                <div className="annSectionTitle">Resources</div>
+                <div className="annList">
+                  {p.resources.map((r, idx) => (
+                    <div className="annListItem" key={`${r.title}-${idx}`}>
+                      <div className="annListTop">
+                        <strong>{r.title}</strong>
+                        {r.url?.trim() ? (
+                          <a
+                            className="annInlineLink"
+                            href={r.url.startsWith("http") ? r.url : `https://${r.url}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open
+                          </a>
+                        ) : null}
+                      </div>
+                      {r.description?.trim() ? <div className="muted">{r.description}</div> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {(p.companyName?.trim() || p.companyDescription?.trim() || p.companyDomains?.length) && (
+              <div className="annSection">
+                <div className="annSectionTitle">Company</div>
+                {p.companyName?.trim() ? (
+                  <div>
+                    <strong>{p.companyName}</strong>
+                  </div>
+                ) : null}
+                {p.companyDescription?.trim() ? (
+                  <div className="muted" style={{ marginTop: 6 }}>
+                    {p.companyDescription}
+                  </div>
+                ) : null}
+                {p.companyDomains?.length ? (
+                  <div className="annPills">
+                    {p.companyDomains.slice(0, 12).map((d) => (
+                      <span className="annPill" key={d}>
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {(p.linkedinUrl?.trim() || p.githubUrl?.trim() || p.website?.trim()) && (
+              <div className="annSection">
+                <div className="annSectionTitle">Links</div>
+                <div className="annPills">
+                  {showLink("LinkedIn", p.linkedinUrl)}
+                  {showLink("GitHub", p.githubUrl)}
+                  {showLink("Website", p.website)}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
