@@ -1,3 +1,4 @@
+/* src/pages/Publications.tsx */
 import { useEffect, useState } from "react";
 import "./ExploreLists.css";
 
@@ -18,19 +19,15 @@ const toUrl = (raw?: string | null) => {
   return v.startsWith("http") ? v : `https://${v}`;
 };
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(2,44,34,0.55)",
-  color: "#eaf7f1",
-  outline: "none",
-  padding: "10px 12px",
-  height: 44
+const parseYear = (raw: string) => {
+  const y = raw.trim();
+  if (!y) return undefined;
+  const n = Number(y);
+  if (!Number.isFinite(n) || n < 1900 || n > 2100) return null;
+  return n;
 };
 
 export default function Publications() {
-  // My
   const [myPubs, setMyPubs] = useState<PublicationDto[]>([]);
   const [myLoading, setMyLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -38,7 +35,6 @@ export default function Publications() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editing, setEditing] = useState({ title: "", venue: "", year: "", url: "" });
 
-  // Explore global
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
   const [globalLoading, setGlobalLoading] = useState(false);
@@ -89,9 +85,8 @@ export default function Publications() {
     const title = norm(draft.title);
     if (!title) return;
 
-    const y = draft.year.trim();
-    const yearNum = y ? Number(y) : undefined;
-    if (yearNum !== undefined && (!Number.isFinite(yearNum) || yearNum < 1900 || yearNum > 2100)) {
+    const yearNum = parseYear(draft.year);
+    if (yearNum === null) {
       alert("Year must be between 1900 and 2100");
       return;
     }
@@ -100,7 +95,7 @@ export default function Publications() {
       const created = await createPublication({
         title,
         venue: norm(draft.venue) || undefined,
-        year: yearNum,
+        year: yearNum === undefined ? undefined : yearNum,
         url: norm(draft.url) || undefined
       });
       setMyPubs((p) => [created, ...p]);
@@ -134,9 +129,8 @@ export default function Publications() {
     const title = norm(editing.title);
     if (!title) return;
 
-    const y = editing.year.trim();
-    const yearNum = y ? Number(y) : undefined;
-    if (yearNum !== undefined && (!Number.isFinite(yearNum) || yearNum < 1900 || yearNum > 2100)) {
+    const yearNum = parseYear(editing.year);
+    if (yearNum === null) {
       alert("Year must be between 1900 and 2100");
       return;
     }
@@ -145,7 +139,7 @@ export default function Publications() {
       const updated = await updatePublication(editingId, {
         title,
         venue: norm(editing.venue) || undefined,
-        year: yearNum,
+        year: yearNum === undefined ? undefined : yearNum,
         url: norm(editing.url) || undefined
       });
       setMyPubs((list) => list.map((x) => (x.id === updated.id ? updated : x)));
@@ -191,134 +185,206 @@ export default function Publications() {
           </div>
         </div>
 
-        {/* MY PUBLICATIONS */}
-        <div className="card" style={{ padding: 18, marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <strong>My Publications</strong>
-            <span className="muted">{myPubs.length} items</span>
-          </div>
-
-          {showAdd && (
-            <div className="annList" style={{ marginTop: 12 }}>
-              <div className="annListItem">
-                <div className="muted" style={{ marginBottom: 8 }}>Add publication</div>
-
-                <input style={inputStyle} value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} placeholder="Title" />
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: 10, marginTop: 10 }}>
-                  <input style={inputStyle} value={draft.venue} onChange={(e) => setDraft((d) => ({ ...d, venue: e.target.value }))} placeholder="Venue" />
-                  <input style={inputStyle} value={draft.year} onChange={(e) => setDraft((d) => ({ ...d, year: e.target.value }))} placeholder="Year" />
-                </div>
-
-                <input style={{ ...inputStyle, marginTop: 10 }} value={draft.url} onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))} placeholder="Link" />
-
-                <button className="btn-primary" type="button" onClick={add} disabled={!draft.title.trim()} style={{ width: "100%", marginTop: 10 }}>
-                  Save
-                </button>
-              </div>
+        <div className="twoCol">
+          {/* MY PUBLICATIONS */}
+          <div className="card" style={{ padding: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <strong>My Publications</strong>
+              <span className="muted">{myPubs.length} items</span>
             </div>
-          )}
 
-          <div className="annList" style={{ marginTop: 12 }}>
-            {myPubs.length ? (
-              myPubs.map((p) => (
-                <div className="annListItem" key={p.id}>
-                  {editingId === p.id ? (
-                    <>
-                      <input style={inputStyle} value={editing.title} onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))} />
+            {showAdd && (
+              <div className="annList" style={{ marginTop: 12 }}>
+                <div className="annListItem">
+                  <div className="muted" style={{ marginBottom: 8 }}>
+                    Add publication
+                  </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: 10, marginTop: 10 }}>
-                        <input style={inputStyle} value={editing.venue} onChange={(e) => setEditing((d) => ({ ...d, venue: e.target.value }))} />
-                        <input style={inputStyle} value={editing.year} onChange={(e) => setEditing((d) => ({ ...d, year: e.target.value }))} />
-                      </div>
+                  <input
+                    className="ecoInput"
+                    value={draft.title}
+                    onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                    placeholder="Title"
+                  />
 
-                      <input style={{ ...inputStyle, marginTop: 10 }} value={editing.url} onChange={(e) => setEditing((d) => ({ ...d, url: e.target.value }))} />
+                  <div className="formRow" style={{ marginTop: 10 }}>
+                    <input
+                      className="ecoInput"
+                      value={draft.venue}
+                      onChange={(e) => setDraft((d) => ({ ...d, venue: e.target.value }))}
+                      placeholder="Venue"
+                    />
+                    <input
+                      className="ecoInput"
+                      value={draft.year}
+                      onChange={(e) => setDraft((d) => ({ ...d, year: e.target.value }))}
+                      placeholder="Year"
+                    />
+                  </div>
 
-                      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                        <button className="btn-primary" type="button" onClick={saveEdit} disabled={!editing.title.trim()} style={{ flex: 1 }}>
-                          Save
-                        </button>
-                        <button className="btn-outline" type="button" onClick={cancelEdit} style={{ flex: 1 }}>
-                          Cancel
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="annListTop">
-                        <strong>{p.title}</strong>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button className="btn-outline" type="button" onClick={() => startEdit(p)}>
-                            Edit
+                  <input
+                    className="ecoInput"
+                    value={draft.url}
+                    onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
+                    placeholder="Link"
+                    style={{ marginTop: 10 }}
+                  />
+
+                  <button
+                    className="btn-primary"
+                    type="button"
+                    onClick={add}
+                    disabled={!draft.title.trim()}
+                    style={{ width: "100%", marginTop: 10 }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="annList" style={{ marginTop: 12 }}>
+              {myPubs.length ? (
+                myPubs.map((p) => (
+                  <div className="annListItem" key={p.id}>
+                    {editingId === p.id ? (
+                      <>
+                        <input
+                          className="ecoInput"
+                          value={editing.title}
+                          onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))}
+                        />
+
+                        <div className="formRow" style={{ marginTop: 10 }}>
+                          <input
+                            className="ecoInput"
+                            value={editing.venue}
+                            onChange={(e) => setEditing((d) => ({ ...d, venue: e.target.value }))}
+                          />
+                          <input
+                            className="ecoInput"
+                            value={editing.year}
+                            onChange={(e) => setEditing((d) => ({ ...d, year: e.target.value }))}
+                          />
+                        </div>
+
+                        <input
+                          className="ecoInput"
+                          value={editing.url}
+                          onChange={(e) => setEditing((d) => ({ ...d, url: e.target.value }))}
+                          style={{ marginTop: 10 }}
+                        />
+
+                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                          <button
+                            className="btn-primary"
+                            type="button"
+                            onClick={saveEdit}
+                            disabled={!editing.title.trim()}
+                            style={{ flex: 1 }}
+                          >
+                            Save
                           </button>
-                          <button className="btn-outline" type="button" onClick={() => remove(p.id)}>
-                            Delete
+                          <button className="btn-outline" type="button" onClick={cancelEdit} style={{ flex: 1 }}>
+                            Cancel
                           </button>
                         </div>
-                      </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="annListTop">
+                          <div className="itemTitle">
+                            <strong>{p.title}</strong>
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button className="btn-outline" type="button" onClick={() => startEdit(p)}>
+                              Edit
+                            </button>
+                            <button className="btn-outline" type="button" onClick={() => remove(p.id)}>
+                              Delete
+                            </button>
+                          </div>
+                        </div>
 
-                      {(p.venue || p.year) ? (
-                        <div className="muted">{[p.venue, p.year ? String(p.year) : ""].filter(Boolean).join(" · ")}</div>
-                      ) : null}
+                        {(p.venue || p.year) ? (
+                          <div className="itemMetaRow">
+                            {p.venue ? <span className="chip">{p.venue}</span> : null}
+                            {p.year ? <span className="chip">{p.year}</span> : null}
+                          </div>
+                        ) : null}
 
-                      {p.url?.trim() ? (
-                        <a className="annPill" href={toUrl(p.url)} target="_blank" rel="noreferrer" style={{ marginTop: 10 }}>
-                          Open
-                        </a>
-                      ) : null}
-                    </>
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="muted">No publications yet.</div>
-            )}
-          </div>
-        </div>
-
-        {/* EXPLORE GLOBAL */}
-        <div className="card" style={{ padding: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <strong>Explore (All Publications)</strong>
-            <span className="muted">Search by user name or publication title</span>
-          </div>
-
-          <input
-            style={{ ...inputStyle, marginTop: 12 }}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search: user name, title, venue, year..."
-          />
-
-          <div className="annList" style={{ marginTop: 12 }}>
-            {globalLoading && global.length === 0 ? <div className="muted">Loading...</div> : null}
-
-            {global.map((p) => (
-              <div className="annListItem" key={`g-${p.id}`}>
-                <div className="annListTop">
-                  <strong>{p.title}</strong>
-                  {p.url?.trim() ? (
-                    <a className="annInlineLink" href={toUrl(p.url)} target="_blank" rel="noreferrer">
-                      Open
-                    </a>
-                  ) : null}
-                </div>
-
-                <div className="muted">
-                  {(p.userFirstName || p.userLastName) ? `${p.userFirstName || ""} ${p.userLastName || ""}`.trim() : "Unknown user"}
-                  {p.userRole ? ` · ${p.userRole}` : ""}
-                  {(p.venue || p.year) ? ` · ${[p.venue, p.year ? String(p.year) : ""].filter(Boolean).join(" · ")}` : ""}
-                </div>
-              </div>
-            ))}
-
-            {!globalLoading && global.length === 0 ? <div className="muted">No results.</div> : null}
+                        {p.url?.trim() ? (
+                          <a className="annPill" href={toUrl(p.url)} target="_blank" rel="noreferrer" style={{ marginTop: 10 }}>
+                            Open
+                          </a>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="muted">No publications yet.</div>
+              )}
+            </div>
           </div>
 
-          <div className="annMore" style={{ marginTop: 12 }}>
-            <button className="btn-outline" type="button" onClick={() => loadGlobal(page + 1, false)} disabled={!canLoadMore || globalLoading}>
-              {globalLoading ? "Loading..." : canLoadMore ? "Load more" : "No more"}
-            </button>
+          {/* EXPLORE GLOBAL */}
+          <div className="card" style={{ padding: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <strong>Explore</strong>
+              <span className="muted">Search by user name or publication title</span>
+            </div>
+
+            <input
+              className="ecoInput"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search: user name, title, venue, year..."
+              style={{ marginTop: 12 }}
+            />
+
+            <div className="listGrid" style={{ marginTop: 12 }}>
+              {globalLoading && global.length === 0 ? <div className="muted">Loading...</div> : null}
+
+              {global.map((p) => (
+                <div className="annListItem" key={`g-${p.id}`}>
+                  <div className="annListTop">
+                    <div className="itemTitle">
+                      <strong>{p.title}</strong>
+                    </div>
+                    {p.url?.trim() ? (
+                      <a className="annInlineLink" href={toUrl(p.url)} target="_blank" rel="noreferrer">
+                        Open
+                      </a>
+                    ) : null}
+                  </div>
+
+                  <div className="itemMetaRow">
+                    <span className="chip">
+                      {(p.userFirstName || p.userLastName)
+                        ? `${p.userFirstName || ""} ${p.userLastName || ""}`.trim()
+                        : "Unknown user"}
+                    </span>
+                    {p.userRole ? <span className="chip">{p.userRole}</span> : null}
+                    {p.venue ? <span className="chip">{p.venue}</span> : null}
+                    {p.year ? <span className="chip">{p.year}</span> : null}
+                  </div>
+                </div>
+              ))}
+
+              {!globalLoading && global.length === 0 ? <div className="muted">No results.</div> : null}
+            </div>
+
+            <div className="annMore" style={{ marginTop: 12 }}>
+              <button
+                className="btn-outline"
+                type="button"
+                onClick={() => loadGlobal(page + 1, false)}
+                disabled={!canLoadMore || globalLoading}
+              >
+                {globalLoading ? "Loading..." : canLoadMore ? "Load more" : "No more"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

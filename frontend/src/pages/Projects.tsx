@@ -1,3 +1,4 @@
+/* src/pages/Projects.tsx */
 import { useEffect, useState } from "react";
 import "./ExploreLists.css";
 
@@ -18,19 +19,7 @@ const toUrl = (raw?: string | null) => {
   return v.startsWith("http") ? v : `https://${v}`;
 };
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(2,44,34,0.55)",
-  color: "#eaf7f1",
-  outline: "none",
-  padding: "10px 12px",
-  height: 44
-};
-
 export default function Projects() {
-  // My
   const [myProjects, setMyProjects] = useState<ProjectDto[]>([]);
   const [myLoading, setMyLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -38,7 +27,6 @@ export default function Projects() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editing, setEditing] = useState({ title: "", description: "", url: "" });
 
-  // Explore global
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
   const [globalLoading, setGlobalLoading] = useState(false);
@@ -79,11 +67,8 @@ export default function Projects() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // When q changes, reload first page (debounced)
   useEffect(() => {
-    const t = window.setTimeout(() => {
-      loadGlobal(0, true);
-    }, 300);
+    const t = window.setTimeout(() => loadGlobal(0, true), 300);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
@@ -101,8 +86,6 @@ export default function Projects() {
       setMyProjects((p) => [created, ...p]);
       setDraft({ title: "", description: "", url: "" });
       setShowAdd(false);
-
-      // refresh global so it appears there too
       loadGlobal(0, true);
     } catch (e) {
       console.error(e);
@@ -122,6 +105,7 @@ export default function Projects() {
 
   const saveEdit = async () => {
     if (!editingId) return;
+
     const title = norm(editing.title);
     if (!title) return;
 
@@ -174,127 +158,181 @@ export default function Projects() {
           </div>
         </div>
 
-        {/* MY PROJECTS */}
-        <div className="card" style={{ padding: 18, marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <strong>My Projects</strong>
-            <span className="muted">{myProjects.length} items</span>
-          </div>
-
-          {showAdd && (
-            <div className="annList" style={{ marginTop: 12 }}>
-              <div className="annListItem">
-                <div className="muted" style={{ marginBottom: 8 }}>Add project</div>
-                <input style={inputStyle} value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} placeholder="Title" />
-                <textarea
-                  style={{ ...inputStyle, height: 90, paddingTop: 10, marginTop: 10 }}
-                  value={draft.description}
-                  onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
-                  placeholder="Description"
-                />
-                <input style={{ ...inputStyle, marginTop: 10 }} value={draft.url} onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))} placeholder="Link" />
-                <button className="btn-primary" type="button" onClick={add} disabled={!draft.title.trim()} style={{ width: "100%", marginTop: 10 }}>
-                  Save
-                </button>
-              </div>
+        <div className="twoCol">
+          {/* MY PROJECTS */}
+          <div className="card" style={{ padding: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <strong>My Projects</strong>
+              <span className="muted">{myProjects.length} items</span>
             </div>
-          )}
 
-          <div className="annList" style={{ marginTop: 12 }}>
-            {myProjects.length ? (
-              myProjects.map((p) => (
-                <div className="annListItem" key={p.id}>
-                  {editingId === p.id ? (
-                    <>
-                      <input style={inputStyle} value={editing.title} onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))} />
-                      <textarea
-                        style={{ ...inputStyle, height: 90, paddingTop: 10, marginTop: 10 }}
-                        value={editing.description}
-                        onChange={(e) => setEditing((d) => ({ ...d, description: e.target.value }))}
-                      />
-                      <input style={{ ...inputStyle, marginTop: 10 }} value={editing.url} onChange={(e) => setEditing((d) => ({ ...d, url: e.target.value }))} />
-                      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                        <button className="btn-primary" type="button" onClick={saveEdit} disabled={!editing.title.trim()} style={{ flex: 1 }}>
-                          Save
-                        </button>
-                        <button className="btn-outline" type="button" onClick={cancelEdit} style={{ flex: 1 }}>
-                          Cancel
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="annListTop">
-                        <strong>{p.title}</strong>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button className="btn-outline" type="button" onClick={() => startEdit(p)}>
-                            Edit
+            {showAdd && (
+              <div className="annList" style={{ marginTop: 12 }}>
+                <div className="annListItem">
+                  <div className="muted" style={{ marginBottom: 8 }}>
+                    Add project
+                  </div>
+                  <input
+                    className="ecoInput"
+                    value={draft.title}
+                    onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                    placeholder="Title"
+                  />
+                  <textarea
+                    className="ecoTextarea"
+                    value={draft.description}
+                    onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+                    placeholder="Description"
+                    style={{ marginTop: 10 }}
+                  />
+                  <input
+                    className="ecoInput"
+                    value={draft.url}
+                    onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
+                    placeholder="Link"
+                    style={{ marginTop: 10 }}
+                  />
+                  <button
+                    className="btn-primary"
+                    type="button"
+                    onClick={add}
+                    disabled={!draft.title.trim()}
+                    style={{ width: "100%", marginTop: 10 }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="annList" style={{ marginTop: 12 }}>
+              {myProjects.length ? (
+                myProjects.map((p) => (
+                  <div className="annListItem" key={p.id}>
+                    {editingId === p.id ? (
+                      <>
+                        <input
+                          className="ecoInput"
+                          value={editing.title}
+                          onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))}
+                        />
+                        <textarea
+                          className="ecoTextarea"
+                          value={editing.description}
+                          onChange={(e) => setEditing((d) => ({ ...d, description: e.target.value }))}
+                          style={{ marginTop: 10 }}
+                        />
+                        <input
+                          className="ecoInput"
+                          value={editing.url}
+                          onChange={(e) => setEditing((d) => ({ ...d, url: e.target.value }))}
+                          style={{ marginTop: 10 }}
+                        />
+                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                          <button
+                            className="btn-primary"
+                            type="button"
+                            onClick={saveEdit}
+                            disabled={!editing.title.trim()}
+                            style={{ flex: 1 }}
+                          >
+                            Save
                           </button>
-                          <button className="btn-outline" type="button" onClick={() => remove(p.id)}>
-                            Delete
+                          <button className="btn-outline" type="button" onClick={cancelEdit} style={{ flex: 1 }}>
+                            Cancel
                           </button>
                         </div>
-                      </div>
-                      {p.description?.trim() ? <div className="muted">{p.description}</div> : null}
-                      {p.url?.trim() ? (
-                        <a className="annPill" href={toUrl(p.url)} target="_blank" rel="noreferrer" style={{ marginTop: 10 }}>
-                          Open
-                        </a>
-                      ) : null}
-                    </>
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="muted">No projects yet.</div>
-            )}
-          </div>
-        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="annListTop">
+                          <div className="itemTitle">
+                            <strong>{p.title}</strong>
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button className="btn-outline" type="button" onClick={() => startEdit(p)}>
+                              Edit
+                            </button>
+                            <button className="btn-outline" type="button" onClick={() => remove(p.id)}>
+                              Delete
+                            </button>
+                          </div>
+                        </div>
 
-        {/* EXPLORE GLOBAL */}
-        <div className="card" style={{ padding: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <strong>Explore (All Projects)</strong>
-            <span className="muted">Search by user name or project title</span>
-          </div>
+                        {p.description?.trim() ? <div className="itemDesc">{p.description}</div> : null}
 
-          <input
-            style={{ ...inputStyle, marginTop: 12 }}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search: user name, title, description..."
-          />
-
-          <div className="annList" style={{ marginTop: 12 }}>
-            {globalLoading && global.length === 0 ? <div className="muted">Loading...</div> : null}
-
-            {global.map((p) => (
-              <div className="annListItem" key={`g-${p.id}`}>
-                <div className="annListTop">
-                  <strong>{p.title}</strong>
-                  {p.url?.trim() ? (
-                    <a className="annInlineLink" href={toUrl(p.url)} target="_blank" rel="noreferrer">
-                      Open
-                    </a>
-                  ) : null}
-                </div>
-
-                <div className="muted">
-                  {(p.userFirstName || p.userLastName) ? `${p.userFirstName || ""} ${p.userLastName || ""}`.trim() : "Unknown user"}
-                  {p.userRole ? ` · ${p.userRole}` : ""}
-                </div>
-
-                {p.description?.trim() ? <div className="muted" style={{ marginTop: 6 }}>{p.description}</div> : null}
-              </div>
-            ))}
-
-            {!globalLoading && global.length === 0 ? <div className="muted">No results.</div> : null}
+                        {p.url?.trim() ? (
+                          <a className="annPill" href={toUrl(p.url)} target="_blank" rel="noreferrer" style={{ marginTop: 10 }}>
+                            Open
+                          </a>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="muted">No projects yet.</div>
+              )}
+            </div>
           </div>
 
-          <div className="annMore" style={{ marginTop: 12 }}>
-            <button className="btn-outline" type="button" onClick={() => loadGlobal(page + 1, false)} disabled={!canLoadMore || globalLoading}>
-              {globalLoading ? "Loading..." : canLoadMore ? "Load more" : "No more"}
-            </button>
+          {/* EXPLORE GLOBAL */}
+          <div className="card" style={{ padding: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <strong>Explore</strong>
+              <span className="muted">Search by user name or project title</span>
+            </div>
+
+            <input
+              className="ecoInput"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search: user name, title, description..."
+              style={{ marginTop: 12 }}
+            />
+
+            <div className="listGrid" style={{ marginTop: 12 }}>
+              {globalLoading && global.length === 0 ? <div className="muted">Loading...</div> : null}
+
+              {global.map((p) => (
+                <div className="annListItem" key={`g-${p.id}`}>
+                  <div className="annListTop">
+                    <div className="itemTitle">
+                      <strong>{p.title}</strong>
+                    </div>
+                    {p.url?.trim() ? (
+                      <a className="annInlineLink" href={toUrl(p.url)} target="_blank" rel="noreferrer">
+                        Open
+                      </a>
+                    ) : null}
+                  </div>
+
+                  <div className="itemMetaRow">
+                    <span className="chip">
+                      {(p.userFirstName || p.userLastName)
+                        ? `${p.userFirstName || ""} ${p.userLastName || ""}`.trim()
+                        : "Unknown user"}
+                    </span>
+                    {p.userRole ? <span className="chip">{p.userRole}</span> : null}
+                  </div>
+
+                  {p.description?.trim() ? <div className="itemDesc">{p.description}</div> : null}
+                </div>
+              ))}
+
+              {!globalLoading && global.length === 0 ? <div className="muted">No results.</div> : null}
+            </div>
+
+            <div className="annMore" style={{ marginTop: 12 }}>
+              <button
+                className="btn-outline"
+                type="button"
+                onClick={() => loadGlobal(page + 1, false)}
+                disabled={!canLoadMore || globalLoading}
+              >
+                {globalLoading ? "Loading..." : canLoadMore ? "Load more" : "No more"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
