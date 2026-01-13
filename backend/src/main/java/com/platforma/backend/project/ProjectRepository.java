@@ -1,4 +1,28 @@
 package com.platforma.backend.project;
 
-public class ProjectRepository {
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+
+public interface ProjectRepository extends JpaRepository<Project, Long> {
+
+    // pentru My Projects / Projects by user
+    List<Project> findByUserIdOrderByIdDesc(Long userId);
+
+    // pentru Explore global (toată lumea + search)
+    @Query("""
+        SELECT p FROM Project p
+        JOIN p.user u
+        WHERE (:q IS NULL OR :q = '' OR
+               LOWER(p.title) LIKE LOWER(CONCAT('%', :q, '%')) OR
+               LOWER(COALESCE(p.description, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
+               LOWER(COALESCE(p.url, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
+               LOWER(COALESCE(u.firstName, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
+               LOWER(COALESCE(u.lastName, '')) LIKE LOWER(CONCAT('%', :q, '%'))
+        )
+        """)
+    Page<Project> searchAll(@Param("q") String q, Pageable pageable);
 }
