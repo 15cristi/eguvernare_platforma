@@ -1,6 +1,7 @@
 package com.platforma.backend.announcement;
 
 import com.platforma.backend.announcement.dto.AnnouncementDtos.*;
+import com.platforma.backend.user.User;
 import com.platforma.backend.user.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,13 @@ public class AnnouncementController {
         return userRepository.findByEmail(email)
                 .map(u -> u.getId())
                 .orElse(null);
+    }
+
+    private User myUser(Authentication auth) {
+        if (auth == null || !auth.isAuthenticated()) return null;
+        String email = auth.getName();
+        if (email == null || email.isBlank()) return null;
+        return userRepository.findByEmail(email).orElse(null);
     }
 
     @GetMapping("/feed")
@@ -58,5 +66,13 @@ public class AnnouncementController {
         Long uid = myUserId(auth);
         if (uid == null) throw new RuntimeException("Unauthorized");
         return service.addComment(uid, postId, req);
+    }
+
+    // ADMIN poate sterge orice; user normal poate sterge doar ce a postat el
+    @DeleteMapping("/{postId}")
+    public void deletePost(Authentication auth, @PathVariable Long postId) {
+        User me = myUser(auth);
+        if (me == null) throw new RuntimeException("Unauthorized");
+        service.deletePost(me.getId(), postId);
     }
 }

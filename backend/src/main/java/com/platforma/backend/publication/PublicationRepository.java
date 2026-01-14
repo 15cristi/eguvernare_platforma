@@ -8,21 +8,18 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface PublicationRepository extends JpaRepository<Publication, Long> {
+    List<Publication> findByUserIdOrderByIdDesc(Long userId);
 
-    // pentru My Publications / Publications by user
-    List<Publication> findByUserIdOrderByYearDescIdDesc(Long userId);
-
-    // pentru Explore global
     @Query("""
-        SELECT p FROM Publication p
-        JOIN p.user u
-        WHERE (:q IS NULL OR :q = '' OR
-               LOWER(p.title) LIKE LOWER(CONCAT('%', :q, '%')) OR
-               LOWER(COALESCE(p.venue, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
-               LOWER(COALESCE(p.url, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
-               CAST(COALESCE(p.year, 0) AS string) LIKE CONCAT('%', :q, '%') OR
-               LOWER(COALESCE(u.firstName, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
-               LOWER(COALESCE(u.lastName, '')) LIKE LOWER(CONCAT('%', :q, '%'))
+        select p from Publication p
+        join p.user u
+        where (:q is null or :q = '' or
+               lower(p.title) like lower(concat('%', :q, '%')) or
+               lower(coalesce(p.venue, '')) like lower(concat('%', :q, '%')) or
+               lower(coalesce(p.url, '')) like lower(concat('%', :q, '%')) or
+               cast(coalesce(p.year, 0) as string) like concat('%', :q, '%') or
+               lower(coalesce(u.firstName, '')) like lower(concat('%', :q, '%')) or
+               lower(coalesce(u.lastName, '')) like lower(concat('%', :q, '%'))
         )
         """)
     Page<Publication> searchAll(@Param("q") String q, Pageable pageable);

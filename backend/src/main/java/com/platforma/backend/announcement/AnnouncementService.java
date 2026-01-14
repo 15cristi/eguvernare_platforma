@@ -2,6 +2,7 @@ package com.platforma.backend.announcement;
 
 import com.platforma.backend.announcement.dto.AnnouncementDtos.*;
 import com.platforma.backend.user.User;
+import com.platforma.backend.user.Role;
 import com.platforma.backend.user.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.PageRequest;
@@ -129,5 +130,24 @@ public class AnnouncementService {
 
         commentRepo.save(c);
         return commentDto(c);
+    }
+
+    // ADMIN poate sterge orice postare; altfel doar owner
+    @Transactional
+    public void deletePost(Long requesterUserId, Long postId) {
+        User me = userRepo.findById(requesterUserId).orElseThrow();
+        AnnouncementPost post = postRepo.findById(postId).orElseThrow();
+
+        boolean isOwner = post.getAuthor() != null && post.getAuthor().getId().equals(requesterUserId);
+        boolean isAdmin = me.getRole() == Role.ADMIN;
+
+        if (!isOwner && !isAdmin) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        // Evita probleme FK: intai copii, apoi postarea
+        likeRepo.deleteByPostId(postId);
+        commentRepo.deleteByPostId(postId);
+        postRepo.delete(post);
     }
 }

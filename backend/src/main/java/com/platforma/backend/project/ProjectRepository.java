@@ -14,15 +14,20 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     // pentru Explore global (toată lumea + search)
     @Query("""
-        SELECT p FROM Project p
-        JOIN p.user u
-        WHERE (:q IS NULL OR :q = '' OR
-               LOWER(p.title) LIKE LOWER(CONCAT('%', :q, '%')) OR
-               LOWER(COALESCE(p.description, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
-               LOWER(COALESCE(p.url, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
-               LOWER(COALESCE(u.firstName, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
-               LOWER(COALESCE(u.lastName, '')) LIKE LOWER(CONCAT('%', :q, '%'))
-        )
-        """)
+SELECT p FROM Project p
+JOIN p.user u
+WHERE (:q IS NULL OR :q = '' OR
+       LOWER(p.title) LIKE LOWER(CONCAT('%', :q, '%')) OR
+       LOWER(COALESCE(p.acronym, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
+       LOWER(COALESCE(p.abstractEn, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
+       LOWER(COALESCE(p.partners, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
+       LOWER(COALESCE(p.coordinator, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
+       LOWER(COALESCE(p.contractNumber, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
+       LOWER(COALESCE(p.url, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
+       LOWER(COALESCE(u.firstName, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
+       LOWER(COALESCE(u.lastName, '')) LIKE LOWER(CONCAT('%', :q, '%'))
+)
+""")
     Page<Project> searchAll(@Param("q") String q, Pageable pageable);
+
 }

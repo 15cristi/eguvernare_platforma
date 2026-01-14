@@ -3,6 +3,7 @@ package com.platforma.backend.project;
 import com.platforma.backend.project.dto.ProjectRequest;
 import com.platforma.backend.project.dto.ProjectResponse;
 import com.platforma.backend.user.User;
+import com.platforma.backend.user.Role;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -48,6 +49,13 @@ public class ProjectController {
         projectService.delete(user.getId(), projectId);
     }
 
+    // Admin-only delete (any project)
+    @DeleteMapping("/{projectId}")
+    public void adminDelete(@AuthenticationPrincipal User user, @PathVariable Long projectId) {
+        if (user == null || user.getRole() != Role.ADMIN) throw new RuntimeException("Not allowed");
+        projectService.deleteAny(projectId);
+    }
+
     private List<ProjectResponse> toResponses(List<Project> items) {
         return items.stream().map(this::toResponse).collect(Collectors.toList());
     }
@@ -59,12 +67,20 @@ public class ProjectController {
                 .userFirstName(p.getUser().getFirstName())
                 .userLastName(p.getUser().getLastName())
                 .userRole(p.getUser().getRole() != null ? p.getUser().getRole().name() : null)
+
                 .title(p.getTitle())
-                .description(p.getDescription())
+                .acronym(p.getAcronym())
+                .abstractEn(p.getAbstractEn())
+                .partners(p.getPartners())
+                .coordinator(p.getCoordinator())
+                .contractNumber(p.getContractNumber())
+                .startDate(p.getStartDate())
+                .endDate(p.getEndDate())
+                .possibleExtensionEndDate(p.getPossibleExtensionEndDate())
+
                 .url(p.getUrl())
                 .build();
     }
-
 
     @GetMapping
     public PageResponse<ProjectResponse> listAll(
@@ -85,9 +101,4 @@ public class ProjectController {
                 .totalPages(result.getTotalPages())
                 .build();
     }
-
-
-
-
-
 }
