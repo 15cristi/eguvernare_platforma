@@ -1,23 +1,22 @@
 /* src/pages/Publications.tsx */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./ExploreLists.css";
 
+import api from "../api/axios";
 import {
-  createPublication,
-  deletePublication,
   getMyPublications,
+  createPublication,
   updatePublication,
+  deletePublication,
+  deletePublicationAdmin,
   getAllPublications,
-  type PublicationDto
+  uploadPublicationPdf,
+  type PublicationDto,
+  type PublicationType
 } from "../api/publications";
+import type { PageResponse } from "../api/types";
 
-const norm = (s?: string | null) => (s || "").trim();
-
-const toUrl = (raw?: string | null) => {
-  const v = norm(raw);
-  if (!v) return "";
-  return v.startsWith("http") ? v : `https://${v}`;
-};
+const norm = (s?: string | null) => (s || "").trim().replace(/\s+/g, " ");
 
 const parseYear = (raw: string) => {
   const y = raw.trim();
@@ -27,367 +26,1262 @@ const parseYear = (raw: string) => {
   return n;
 };
 
-export default function Publications() {
-  const [myPubs, setMyPubs] = useState<PublicationDto[]>([]);
-  const [myLoading, setMyLoading] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
-  const [draft, setDraft] = useState({ title: "", venue: "", year: "", url: "" });
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editing, setEditing] = useState({ title: "", venue: "", year: "", url: "" });
+const toUrl = (raw?: string | null) => {
+  const v = norm(raw);
+  if (!v) return "";
+  return v.startsWith("http") ? v : `https://${v}`;
+};
 
+const joinName = (first?: string | null, last?: string | null) => `${first || ""} ${last || ""}`.trim();
+
+const typeOptions: { label: string; value: PublicationType }[] = [
+  { label: "Journal Article", value: "ARTICOL_JURNAL" },
+  { label: "Conference Paper", value: "LUCRARE_CONFERINTA" },
+  { label: "Book", value: "CARTE" },
+  { label: "Book Chapter", value: "CAPITOL_CARTE" }
+];
+
+const prettyType = (t?: string | null) => {
+  if (!t) return "";
+  switch (t) {
+    case "ARTICOL_JURNAL":
+      return "Journal Article";
+    case "LUCRARE_CONFERINTA":
+      return "Conference Paper";
+    case "CARTE":
+      return "Book";
+    case "CAPITOL_CARTE":
+      return "Book Chapter";
+    default:
+      return String(t);
+  }
+};
+
+// Your backend returns pdfPath like "/files/publications/xyz.pdf"
+const API_BASE = (import.meta as any).env?.VITE_API_URL || "http://localhost:8080";
+const toPdfUrl = (p: any) => {
+  const v = norm(p?.pdfPath || p?.pdfUrl);
+  if (!v) return "";
+  if (v.startsWith("http")) return v;
+  return `${API_BASE}${v.startsWith("/") ? "" : "/"}${v}`;
+};
+
+/** ===== Auth helpers (role + userId) ===== */
+type AuthInfo = { userId: number | null; role: string | null };
+
+const safeJson = (raw: string | null) => {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const decodeJwtPayload = (token: string) => {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const json = decodeURIComponent(
+      atob(padded)
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join("")
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+};
+
+const readAuthInfo = (): AuthInfo => {
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+
+  const payload = token ? decodeJwtPayload(token) : null;
+
+  const roleFromPayload =
+    payload?.role ||
+    payload?.userRole ||
+    (Array.isArray(payload?.roles) ? payload.roles[0] : null) ||
+    (Array.isArray(payload?.authorities)
+      ? String(payload.authorities[0]?.authority || payload.authorities[0])
+      : null) ||
+    null;
+
+  const idFromPayload =
+    payload?.userId ??
+    payload?.id ??
+    payload?.uid ??
+    (typeof payload?.sub === "number" ? payload.sub : null) ??
+    null;
+
+  if (roleFromPayload || idFromPayload) {
+    return {
+      role: roleFromPayload ? String(roleFromPayload) : null,
+      userId: idFromPayload != null ? Number(idFromPayload) : null
+    };
+  }
+
+  const maybeUser =
+    safeJson(localStorage.getItem("me")) ||
+    safeJson(localStorage.getItem("user")) ||
+    safeJson(localStorage.getItem("auth")) ||
+    safeJson(localStorage.getItem("profile"));
+
+  const role =
+    maybeUser?.role ||
+    maybeUser?.userRole ||
+    (typeof maybeUser?.authorities?.[0] === "string"
+      ? maybeUser.authorities[0]
+      : maybeUser?.authorities?.[0]?.authority) ||
+    null;
+
+  const userId = maybeUser?.id ?? maybeUser?.userId ?? null;
+
+  return { role: role ? String(role) : null, userId: userId != null ? Number(userId) : null };
+};
+
+type Draft = {
+  type: PublicationType;
+  title: string;
+  publisher: string;
+  authors: string;
+  externalLink: string;
+  publishedDate: string; // YYYY-MM-DD
+  keywords: string;
+
+  journalTitle: string;
+  volumeIssue: string;
+  pages: string;
+  doi: string;
+
+  year: string;
+  pdfFile: File | null;
+};
+
+const emptyDraft = (): Draft => ({
+  type: "ARTICOL_JURNAL",
+  title: "",
+  publisher: "",
+  authors: "",
+  externalLink: "",
+  publishedDate: "",
+  keywords: "",
+  journalTitle: "",
+  volumeIssue: "",
+  pages: "",
+  doi: "",
+  year: "",
+  pdfFile: null
+});
+
+type Tab = "MINE" | "EXPLORE";
+
+/* ===== UI helpers: toast + confirm ===== */
+type Toast = { id: number; type: "success" | "error" | "info"; message: string };
+
+function ToastStack({ toasts, onClose }: { toasts: Toast[]; onClose: (id: number) => void }) {
+  if (!toasts.length) return null;
+
+  return (
+    <div className="annToastStack" aria-live="polite">
+      {toasts.map((t) => (
+        <div key={t.id} className={`annToast annToast-${t.type}`} role="status">
+          <div className="annToastMsg">{t.message}</div>
+          <button className="annToastClose" type="button" onClick={() => onClose(t.id)} aria-label="Close">
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConfirmModal({
+  open,
+  title,
+  message,
+  confirmText,
+  cancelText,
+  busy,
+  danger,
+  onCancel,
+  onConfirm
+}: {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  cancelText: string;
+  busy?: boolean;
+  danger?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="annConfirmOverlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div className="annConfirmModal card" role="dialog" aria-modal="true">
+        <div className="annConfirmHead">
+          <h3 className="annConfirmTitle">{title}</h3>
+          <button className="btn-outline annConfirmClose" type="button" onClick={onCancel} disabled={busy}>
+            ×
+          </button>
+        </div>
+
+        <div className="annConfirmMsg">{message}</div>
+
+        <div className="annConfirmActions">
+          <button className="btn-outline" type="button" onClick={onCancel} disabled={busy}>
+            {cancelText}
+          </button>
+
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className={danger ? "annDangerBtn" : "annPrimaryBtn"}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function PublicationsPage() {
+  const [tab, setTab] = useState<Tab>("MINE");
+
+  const [items, setItems] = useState<PublicationDto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [draft, setDraft] = useState<Draft>(emptyDraft());
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editing, setEditing] = useState<Draft>(emptyDraft());
+
+  // Details panel like your screenshot (optional, only for MINE)
+  const [openMineId, setOpenMineId] = useState<number | null>(null);
+
+  // Explore state like Projects
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
-  const [globalLoading, setGlobalLoading] = useState(false);
-  const [global, setGlobal] = useState<PublicationDto[]>([]);
-  const [totalPages, setTotalPages] = useState(1);
+  const [size] = useState(12);
+  const [explore, setExplore] = useState<PageResponse<PublicationDto> | null>(null);
+  const [exploreLoading, setExploreLoading] = useState(false);
+  const [openExploreId, setOpenExploreId] = useState<number | null>(null);
 
-  const refreshMine = async () => {
-    setMyLoading(true);
-    try {
-      const items = await getMyPublications();
-      setMyPubs(items || []);
-    } catch (e) {
-      console.error(e);
-      setMyPubs([]);
-    } finally {
-      setMyLoading(false);
-    }
+  const auth = useMemo(() => readAuthInfo(), []);
+  const isAdmin = auth.role === "ADMIN";
+
+  const isJournalOrConfDraft = draft.type === "ARTICOL_JURNAL" || draft.type === "LUCRARE_CONFERINTA";
+  const isBookOrChapterDraft = draft.type === "CARTE" || draft.type === "CAPITOL_CARTE";
+  const isJournalOrConfEdit = editing.type === "ARTICOL_JURNAL" || editing.type === "LUCRARE_CONFERINTA";
+  const isBookOrChapterEdit = editing.type === "CARTE" || editing.type === "CAPITOL_CARTE";
+
+  const selectedMine = useMemo(() => items.find((x) => x.id === openMineId) || null, [items, openMineId]);
+
+  /* ===== toast state ===== */
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastSeq = useRef(1);
+
+  const pushToast = (type: Toast["type"], message: string) => {
+    const id = toastSeq.current++;
+    setToasts((t) => [...t, { id, type, message }]);
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2800);
   };
 
-  const loadGlobal = async (nextPage: number, replace: boolean) => {
-    setGlobalLoading(true);
-    try {
-      const res = await getAllPublications(q.trim(), nextPage, 20);
-      setTotalPages(res.totalPages || 1);
-      setPage(res.page || 0);
-      setGlobal((prev) => (replace ? res.items : [...prev, ...res.items]));
-    } catch (e) {
-      console.error(e);
-      if (replace) setGlobal([]);
-    } finally {
-      setGlobalLoading(false);
-    }
+  /* ===== confirm state ===== */
+  const [confirm, setConfirm] = useState<{
+    open: boolean;
+    mode: "MINE" | "EXPLORE_ADMIN";
+    id: number | null;
+    label: string;
+  }>({ open: false, mode: "MINE", id: null, label: "" });
+
+  useEffect(() => {
+    if (!confirm.open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirm({ open: false, mode: "MINE", id: null, label: "" });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirm.open]);
+
+  const validate = (d: Draft) => {
+    if (!norm(d.title)) return "Title is required.";
+    const yearNum = parseYear(d.year || "");
+    if (yearNum === null) return "Year must be between 1900 and 2100.";
+    if (!norm(d.publishedDate)) return "Publication date is required.";
+
+    const isBook = d.type === "CARTE" || d.type === "CAPITOL_CARTE";
+    const isJc = d.type === "ARTICOL_JURNAL" || d.type === "LUCRARE_CONFERINTA";
+
+    if (isBook && !norm(d.publisher)) return "Publisher is required for books/chapters.";
+    if (isJc && !norm(d.journalTitle)) return "Journal / Conference title is required.";
+
+    if (d.pdfFile && d.pdfFile.size > 10 * 1024 * 1024) return "PDF must be max 10 MB.";
+    if (d.pdfFile && d.pdfFile.type !== "application/pdf") return "Only PDF files are allowed.";
+
+    return null;
+  };
+
+  const buildPayload = (d: Draft) => {
+    const yearNum = parseYear(d.year || "");
+    return {
+      type: d.type,
+      title: norm(d.title),
+      authors: norm(d.authors) || undefined,
+      externalLink: norm(d.externalLink) || undefined,
+      publishedDate: norm(d.publishedDate) || undefined,
+      keywords: norm(d.keywords) || undefined,
+
+      publisher: norm(d.publisher) || undefined,
+      journalTitle: norm(d.journalTitle) || undefined,
+      volumeIssue: norm(d.volumeIssue) || undefined,
+      pages: norm(d.pages) || undefined,
+      doi: norm(d.doi) || undefined,
+
+      year: yearNum === undefined ? undefined : yearNum,
+
+      // fallback if older backend still uses url
+      url: norm(d.externalLink) || undefined
+    } as any;
   };
 
   useEffect(() => {
-    refreshMine();
-    loadGlobal(0, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    (async () => {
+      try {
+        const data = await getMyPublications();
+        setItems(data || []);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
+  const refreshMine = async () => {
+    const data = await getMyPublications();
+    setItems(data || []);
+  };
+
+  const loadExplore = async (nextPage: number) => {
+    setExploreLoading(true);
+    try {
+      const res = await getAllPublications(q.trim(), nextPage, size);
+      setExplore(res);
+      setPage(nextPage);
+      setOpenExploreId(null);
+    } catch (e) {
+      console.error(e);
+      setExplore({ items: [], page: 0, size, totalElements: 0, totalPages: 0 } as any);
+      setPage(0);
+      setOpenExploreId(null);
+      pushToast("error", "Could not load publications.");
+    } finally {
+      setExploreLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const t = window.setTimeout(() => loadGlobal(0, true), 300);
-    return () => window.clearTimeout(t);
+    if (tab !== "EXPLORE") return;
+    loadExplore(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  }, [tab]);
 
-  const add = async () => {
-    const title = norm(draft.title);
-    if (!title) return;
+  const addDisabled = useMemo(() => !!validate(draft), [draft]);
+  const editDisabled = useMemo(() => !!validate(editing), [editing]);
 
-    const yearNum = parseYear(draft.year);
-    if (yearNum === null) {
-      alert("Year must be between 1900 and 2100");
+  const onAdd = async () => {
+    const err = validate(draft);
+    if (err) {
+      pushToast("error", err);
       return;
     }
 
+    setSaving(true);
     try {
-      const created = await createPublication({
-        title,
-        venue: norm(draft.venue) || undefined,
-        year: yearNum === undefined ? undefined : yearNum,
-        url: norm(draft.url) || undefined
-      });
-      setMyPubs((p) => [created, ...p]);
-      setDraft({ title: "", venue: "", year: "", url: "" });
+      let created = await createPublication(buildPayload(draft));
+      if (draft.pdfFile) created = await uploadPublicationPdf(created.id, draft.pdfFile);
+
+      setDraft(emptyDraft());
       setShowAdd(false);
-      loadGlobal(0, true);
+      setOpenMineId(created.id);
+      await refreshMine();
+      if (tab === "EXPLORE") await loadExplore(0);
+
+      pushToast("success", "Publication saved.");
     } catch (e) {
       console.error(e);
-      alert("Publication save failed");
+      pushToast("error", "Could not save the publication.");
+    } finally {
+      setSaving(false);
     }
   };
 
   const startEdit = (p: PublicationDto) => {
     setEditingId(p.id);
+    setShowAdd(false);
+
     setEditing({
-      title: p.title || "",
-      venue: p.venue || "",
-      year: p.year ? String(p.year) : "",
-      url: p.url || ""
+      type: ((p as any).type || "ARTICOL_JURNAL") as PublicationType,
+      title: (p as any).title || "",
+      publisher: (p as any).publisher || "",
+      authors: (p as any).authors || "",
+      externalLink: (p as any).externalLink || (p as any).url || "",
+      publishedDate: (p as any).publishedDate || "",
+      keywords: (p as any).keywords || "",
+      journalTitle: (p as any).journalTitle || "",
+      volumeIssue: (p as any).volumeIssue || "",
+      pages: (p as any).pages || "",
+      doi: (p as any).doi || "",
+      year: (p as any).year ? String((p as any).year) : "",
+      pdfFile: null
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditing({ title: "", venue: "", year: "", url: "" });
+    setEditing(emptyDraft());
   };
 
-  const saveEdit = async () => {
-    if (!editingId) return;
+  const onSaveEdit = async () => {
+    if (editingId == null) return;
 
-    const title = norm(editing.title);
-    if (!title) return;
-
-    const yearNum = parseYear(editing.year);
-    if (yearNum === null) {
-      alert("Year must be between 1900 and 2100");
+    const err = validate(editing);
+    if (err) {
+      pushToast("error", err);
       return;
     }
 
+    setSaving(true);
     try {
-      const updated = await updatePublication(editingId, {
-        title,
-        venue: norm(editing.venue) || undefined,
-        year: yearNum === undefined ? undefined : yearNum,
-        url: norm(editing.url) || undefined
-      });
-      setMyPubs((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+      let updated = await updatePublication(editingId, buildPayload(editing));
+      if (editing.pdfFile) updated = await uploadPublicationPdf(updated.id, editing.pdfFile);
+
       cancelEdit();
-      loadGlobal(0, true);
+      await refreshMine();
+      setOpenMineId(updated.id);
+      if (tab === "EXPLORE") await loadExplore(page);
+
+      pushToast("success", "Publication updated.");
     } catch (e) {
       console.error(e);
-      alert("Publication update failed");
+      pushToast("error", "Could not update the publication.");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const remove = async (id: number) => {
-    if (!confirm("Delete this publication?")) return;
+  /* ===== delete flow via confirm modal ===== */
+
+  const requestDeleteMine = (p: PublicationDto) => {
+    const label = norm((p as any).title || "").slice(0, 60) || "this publication";
+    setConfirm({ open: true, mode: "MINE", id: p.id, label });
+  };
+
+  const requestDeleteExploreAdmin = (p: PublicationDto) => {
+    if (!isAdmin) return;
+    const label = norm((p as any).title || "").slice(0, 60) || "this publication";
+    setConfirm({ open: true, mode: "EXPLORE_ADMIN", id: p.id, label });
+  };
+
+  const confirmDeleteNow = async () => {
+    if (!confirm.id) return;
+
+    const id = confirm.id;
+    const mode = confirm.mode;
+
+    setConfirm({ open: false, mode: "MINE", id: null, label: "" });
+    setSaving(true);
+
     try {
-      await deletePublication(id);
-      setMyPubs((list) => list.filter((x) => x.id !== id));
-      if (editingId === id) cancelEdit();
-      loadGlobal(0, true);
+      if (mode === "MINE") {
+        await deletePublication(id);
+        if (editingId === id) cancelEdit();
+        if (openMineId === id) setOpenMineId(null);
+        await refreshMine();
+        if (tab === "EXPLORE") await loadExplore(page);
+      } else {
+        await deletePublicationAdmin(id);
+        if (openExploreId === id) setOpenExploreId(null);
+        await loadExplore(page);
+        await refreshMine();
+      }
+
+      pushToast("success", "Publication deleted.");
     } catch (e) {
       console.error(e);
-      alert("Publication delete failed");
+      pushToast("error", "Could not delete the publication.");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const canLoadMore = page + 1 < totalPages;
+  const openPdfWithAuth = async (p: any) => {
+    const url = toPdfUrl(p);
+    if (!url) return;
+
+    try {
+      const relative = url.startsWith(API_BASE) ? url.slice(API_BASE.length) : url;
+
+      const res = await api.get(relative, { responseType: "blob" });
+      const blobUrl = URL.createObjectURL(res.data);
+      window.open(blobUrl, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (e) {
+      console.error(e);
+      pushToast("error", "Could not open PDF.");
+    }
+  };
+
+  const renderChips = (p: any) => (
+    <div className="itemMetaRow" style={{ marginTop: 10 }}>
+      {p.type ? <span className="chip">{prettyType(p.type)}</span> : null}
+      {p.journalTitle ? <span className="chip">{String(p.journalTitle)}</span> : null}
+      {p.publisher ? <span className="chip">{String(p.publisher)}</span> : null}
+      {p.volumeIssue ? <span className="chip">{String(p.volumeIssue)}</span> : null}
+      {p.pages ? <span className="chip">{String(p.pages)}</span> : null}
+      {p.doi ? <span className="chip">{`DOI: ${String(p.doi)}`}</span> : null}
+      {p.year ? <span className="chip">{String(p.year)}</span> : null}
+      {p.publishedDate ? <span className="chip">{String(p.publishedDate)}</span> : null}
+    </div>
+  );
 
   return (
-    <div className="annShell" style={{ gridTemplateColumns: "1fr" }}>
+    <div className="annShell">
+      <ToastStack toasts={toasts} onClose={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
+
       <div className="annPage">
         <div className="annHeader">
           <div>
             <h2>Publications</h2>
-            <span className="annSub">All publications in the platform + your own.</span>
+            <span className="annSub">Add your publications and explore publications published by others.</span>
           </div>
 
-          <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn-outline" type="button" onClick={refreshMine} disabled={myLoading}>
-              {myLoading ? "Refreshing..." : "Refresh My"}
+          <div className="projectsTabs">
+            <button
+              type="button"
+              className="btn-outline"
+              aria-pressed={tab === "MINE"}
+              onClick={() => setTab("MINE")}
+              disabled={saving}
+            >
+              My publications
             </button>
-            <button className="btn-primary" type="button" onClick={() => setShowAdd((s) => !s)}>
-              {showAdd ? "Close" : "Add Publication"}
+
+            <button
+              type="button"
+              className="btn-outline"
+              aria-pressed={tab === "EXPLORE"}
+              onClick={() => {
+                setTab("EXPLORE");
+                setShowAdd(false);
+                cancelEdit();
+                setOpenMineId(null);
+              }}
+              disabled={saving}
+            >
+              Explore
             </button>
+
+            {tab === "MINE" && (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setShowAdd((v) => !v);
+                  cancelEdit();
+                }}
+                disabled={saving}
+              >
+                {showAdd ? "Close" : "+ New publication"}
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="twoCol">
-          {/* MY PUBLICATIONS */}
-          <div className="card" style={{ padding: 18 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <strong>My Publications</strong>
-              <span className="muted">{myPubs.length} items</span>
-            </div>
-
-            {showAdd && (
-              <div className="annList" style={{ marginTop: 12 }}>
-                <div className="annListItem">
-                  <div className="muted" style={{ marginBottom: 8 }}>
-                    Add publication
-                  </div>
-
-                  <input
-                    className="ecoInput"
-                    value={draft.title}
-                    onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-                    placeholder="Title"
-                  />
-
-                  <div className="formRow" style={{ marginTop: 10 }}>
-                    <input
-                      className="ecoInput"
-                      value={draft.venue}
-                      onChange={(e) => setDraft((d) => ({ ...d, venue: e.target.value }))}
-                      placeholder="Venue"
-                    />
-                    <input
-                      className="ecoInput"
-                      value={draft.year}
-                      onChange={(e) => setDraft((d) => ({ ...d, year: e.target.value }))}
-                      placeholder="Year"
-                    />
-                  </div>
-
-                  <input
-                    className="ecoInput"
-                    value={draft.url}
-                    onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
-                    placeholder="Link"
-                    style={{ marginTop: 10 }}
-                  />
-
-                  <button
-                    className="btn-primary"
-                    type="button"
-                    onClick={add}
-                    disabled={!draft.title.trim()}
-                    style={{ width: "100%", marginTop: 10 }}
-                  >
-                    Save
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="annList" style={{ marginTop: 12 }}>
-              {myPubs.length ? (
-                myPubs.map((p) => (
-                  <div className="annListItem" key={p.id}>
-                    {editingId === p.id ? (
-                      <>
-                        <input
-                          className="ecoInput"
-                          value={editing.title}
-                          onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))}
-                        />
-
-                        <div className="formRow" style={{ marginTop: 10 }}>
-                          <input
+        {tab === "MINE" && (
+          <>
+            {loading ? (
+              <div className="muted">Loading…</div>
+            ) : (
+              <>
+                {showAdd && (
+                  <div className="card" style={{ padding: 16 }}>
+                    <div className="projForm">
+                      <div className="projGrid2">
+                        <label>
+                          Type*
+                          <select
                             className="ecoInput"
-                            value={editing.venue}
-                            onChange={(e) => setEditing((d) => ({ ...d, venue: e.target.value }))}
-                          />
-                          <input
-                            className="ecoInput"
-                            value={editing.year}
-                            onChange={(e) => setEditing((d) => ({ ...d, year: e.target.value }))}
-                          />
-                        </div>
-
-                        <input
-                          className="ecoInput"
-                          value={editing.url}
-                          onChange={(e) => setEditing((d) => ({ ...d, url: e.target.value }))}
-                          style={{ marginTop: 10 }}
-                        />
-
-                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                          <button
-                            className="btn-primary"
-                            type="button"
-                            onClick={saveEdit}
-                            disabled={!editing.title.trim()}
-                            style={{ flex: 1 }}
+                            value={draft.type}
+                            onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value as PublicationType }))}
                           >
-                            Save
-                          </button>
-                          <button className="btn-outline" type="button" onClick={cancelEdit} style={{ flex: 1 }}>
-                            Cancel
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="annListTop">
-                          <div className="itemTitle">
-                            <strong>{p.title}</strong>
-                          </div>
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button className="btn-outline" type="button" onClick={() => startEdit(p)}>
-                              Edit
-                            </button>
-                            <button className="btn-outline" type="button" onClick={() => remove(p.id)}>
-                              Delete
-                            </button>
-                          </div>
-                        </div>
+                            {typeOptions.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
 
-                        {(p.venue || p.year) ? (
-                          <div className="itemMetaRow">
-                            {p.venue ? <span className="chip">{p.venue}</span> : null}
-                            {p.year ? <span className="chip">{p.year}</span> : null}
+                        <label>
+                          Title*
+                          <input
+                            className="ecoInput"
+                            value={draft.title}
+                            onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                            placeholder="Publication title"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="projGrid2">
+                        <label>
+                          Authors
+                          <input
+                            className="ecoInput"
+                            value={draft.authors}
+                            onChange={(e) => setDraft((d) => ({ ...d, authors: e.target.value }))}
+                            placeholder="Authors"
+                          />
+                        </label>
+
+                        <label>
+                          External link
+                          <input
+                            className="ecoInput"
+                            value={draft.externalLink}
+                            onChange={(e) => setDraft((d) => ({ ...d, externalLink: e.target.value }))}
+                            placeholder="https://..."
+                          />
+                        </label>
+                      </div>
+
+                      <div className="projGrid2">
+                        <label>
+                          Publication date*
+                          <input
+                            className="ecoInput"
+                            type="date"
+                            value={draft.publishedDate}
+                            onChange={(e) => setDraft((d) => ({ ...d, publishedDate: e.target.value }))}
+                          />
+                        </label>
+
+                        <label>
+                          Year
+                          <input
+                            className="ecoInput"
+                            value={draft.year}
+                            onChange={(e) => setDraft((d) => ({ ...d, year: e.target.value }))}
+                            placeholder="2009"
+                          />
+                        </label>
+                      </div>
+
+                      <label>
+                        Keywords
+                        <input
+                          className="ecoInput"
+                          value={draft.keywords}
+                          onChange={(e) => setDraft((d) => ({ ...d, keywords: e.target.value }))}
+                          placeholder="keywords"
+                        />
+                      </label>
+
+                      {isJournalOrConfDraft ? (
+                        <>
+                          <div className="projGrid2">
+                            <label>
+                              Journal / Conference title*
+                              <input
+                                className="ecoInput"
+                                value={draft.journalTitle}
+                                onChange={(e) => setDraft((d) => ({ ...d, journalTitle: e.target.value }))}
+                                placeholder="Journal or conference"
+                              />
+                            </label>
+
+                            <label>
+                              Volume / issue
+                              <input
+                                className="ecoInput"
+                                value={draft.volumeIssue}
+                                onChange={(e) => setDraft((d) => ({ ...d, volumeIssue: e.target.value }))}
+                                placeholder="Vol/Issue"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="projGrid2">
+                            <label>
+                              Pages
+                              <input
+                                className="ecoInput"
+                                value={draft.pages}
+                                onChange={(e) => setDraft((d) => ({ ...d, pages: e.target.value }))}
+                                placeholder="1-10"
+                              />
+                            </label>
+
+                            <label>
+                              DOI
+                              <input
+                                className="ecoInput"
+                                value={draft.doi}
+                                onChange={(e) => setDraft((d) => ({ ...d, doi: e.target.value }))}
+                                placeholder="10.1080/..."
+                              />
+                            </label>
+                          </div>
+                        </>
+                      ) : null}
+
+                      {isBookOrChapterDraft ? (
+                        <label>
+                          Publisher*
+                          <input
+                            className="ecoInput"
+                            value={draft.publisher}
+                            onChange={(e) => setDraft((d) => ({ ...d, publisher: e.target.value }))}
+                            placeholder="Publisher"
+                          />
+                        </label>
+                      ) : null}
+
+                      <label>
+                        PDF (max 10 MB)
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          onChange={(e) => setDraft((d) => ({ ...d, pdfFile: e.target.files?.[0] || null }))}
+                        />
+                        {draft.pdfFile ? (
+                          <div className="muted" style={{ marginTop: 6 }}>
+                            {draft.pdfFile.name}
                           </div>
                         ) : null}
+                      </label>
 
-                        {p.url?.trim() ? (
-                          <a className="annPill" href={toUrl(p.url)} target="_blank" rel="noreferrer" style={{ marginTop: 10 }}>
-                            Open
+                      <button type="button" className="btn-primary" onClick={onAdd} disabled={saving || addDisabled}>
+                        {saving ? "Saving…" : "Save"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="card" style={{ padding: 16, marginTop: 16 }}>
+                  <h2 style={{ margin: 0, fontSize: 18 }}>My publications</h2>
+
+                  {items.length === 0 ? (
+                    <div className="muted" style={{ marginTop: 10 }}>
+                      No publications yet.
+                    </div>
+                  ) : (
+                    <div className="annList" style={{ marginTop: 12 }}>
+                      {items.map((p) => {
+                        const isEditing = editingId === p.id;
+                        const isOpen = openMineId === p.id;
+
+                        return (
+                          <div
+                            key={p.id}
+                            className="projectItem"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setOpenMineId((cur) => (cur === p.id ? null : p.id))}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setOpenMineId((cur) => (cur === p.id ? null : p.id));
+                              }
+                            }}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <div className="projectTop">
+                              <div className="projectTitle">
+                                <strong>{(p as any).title}</strong>
+                                <span className="projectMeta">{prettyType((p as any).type)}</span>
+                              </div>
+
+                              <div className="projectActions" onClick={(e) => e.stopPropagation()}>
+                                {!isEditing ? (
+                                  <>
+                                    <button type="button" className="btn-outline" onClick={() => startEdit(p)} disabled={saving}>
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn-outline"
+                                      onClick={() => requestDeleteMine(p)}
+                                      disabled={saving}
+                                    >
+                                      Delete
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button type="button" className="btn-outline" onClick={cancelEdit} disabled={saving}>
+                                      Cancel
+                                    </button>
+                                    <button type="button" className="btn-primary" onClick={onSaveEdit} disabled={saving || editDisabled}>
+                                      Save
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {!isEditing ? (
+                              <>
+                                <div className="projectDetails">{renderChips(p as any)}</div>
+
+                                {isOpen && (
+                                  <div className="projectDetails" style={{ marginTop: 10 }}>
+                                    {(p as any).authors ? (
+                                      <div>
+                                        <span className="k">Authors:</span> {(p as any).authors}
+                                      </div>
+                                    ) : null}
+
+                                    {(p as any).keywords ? (
+                                      <div>
+                                        <span className="k">Keywords:</span> {(p as any).keywords}
+                                      </div>
+                                    ) : null}
+
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10 }}>
+                                      {(p as any).externalLink ? (
+                                        <a
+                                          className="annPill"
+                                          href={toUrl((p as any).externalLink)}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          External link
+                                        </a>
+                                      ) : null}
+
+                                      {(p as any).pdfPath ? (
+                                        <button
+                                          type="button"
+                                          className="btn-outline"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openPdfWithAuth(p as any);
+                                          }}
+                                        >
+                                          Open PDF
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="projForm" style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
+                                <div className="projGrid2">
+                                  <label>
+                                    Type*
+                                    <select
+                                      className="ecoInput"
+                                      value={editing.type}
+                                      onChange={(e) => setEditing((d) => ({ ...d, type: e.target.value as PublicationType }))}
+                                    >
+                                      {typeOptions.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+
+                                  <label>
+                                    Title*
+                                    <input
+                                      className="ecoInput"
+                                      value={editing.title}
+                                      onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))}
+                                    />
+                                  </label>
+                                </div>
+
+                                <div className="projGrid2">
+                                  <label>
+                                    Authors
+                                    <input
+                                      className="ecoInput"
+                                      value={editing.authors}
+                                      onChange={(e) => setEditing((d) => ({ ...d, authors: e.target.value }))}
+                                    />
+                                  </label>
+
+                                  <label>
+                                    External link
+                                    <input
+                                      className="ecoInput"
+                                      value={editing.externalLink}
+                                      onChange={(e) => setEditing((d) => ({ ...d, externalLink: e.target.value }))}
+                                    />
+                                  </label>
+                                </div>
+
+                                <div className="projGrid2">
+                                  <label>
+                                    Publication date*
+                                    <input
+                                      className="ecoInput"
+                                      type="date"
+                                      value={editing.publishedDate}
+                                      onChange={(e) => setEditing((d) => ({ ...d, publishedDate: e.target.value }))}
+                                    />
+                                  </label>
+
+                                  <label>
+                                    Year
+                                    <input
+                                      className="ecoInput"
+                                      value={editing.year}
+                                      onChange={(e) => setEditing((d) => ({ ...d, year: e.target.value }))}
+                                    />
+                                  </label>
+                                </div>
+
+                                <label>
+                                  Keywords
+                                  <input
+                                    className="ecoInput"
+                                    value={editing.keywords}
+                                    onChange={(e) => setEditing((d) => ({ ...d, keywords: e.target.value }))}
+                                  />
+                                </label>
+
+                                {isJournalOrConfEdit ? (
+                                  <>
+                                    <div className="projGrid2">
+                                      <label>
+                                        Journal / Conference title*
+                                        <input
+                                          className="ecoInput"
+                                          value={editing.journalTitle}
+                                          onChange={(e) => setEditing((d) => ({ ...d, journalTitle: e.target.value }))}
+                                        />
+                                      </label>
+
+                                      <label>
+                                        Volume / issue
+                                        <input
+                                          className="ecoInput"
+                                          value={editing.volumeIssue}
+                                          onChange={(e) => setEditing((d) => ({ ...d, volumeIssue: e.target.value }))}
+                                        />
+                                      </label>
+                                    </div>
+
+                                    <div className="projGrid2">
+                                      <label>
+                                        Pages
+                                        <input
+                                          className="ecoInput"
+                                          value={editing.pages}
+                                          onChange={(e) => setEditing((d) => ({ ...d, pages: e.target.value }))}
+                                        />
+                                      </label>
+
+                                      <label>
+                                        DOI
+                                        <input
+                                          className="ecoInput"
+                                          value={editing.doi}
+                                          onChange={(e) => setEditing((d) => ({ ...d, doi: e.target.value }))}
+                                        />
+                                      </label>
+                                    </div>
+                                  </>
+                                ) : null}
+
+                                {isBookOrChapterEdit ? (
+                                  <label>
+                                    Publisher*
+                                    <input
+                                      className="ecoInput"
+                                      value={editing.publisher}
+                                      onChange={(e) => setEditing((d) => ({ ...d, publisher: e.target.value }))}
+                                    />
+                                  </label>
+                                ) : null}
+
+                                <label>
+                                  Replace PDF (max 10 MB)
+                                  <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    onChange={(e) => setEditing((d) => ({ ...d, pdfFile: e.target.files?.[0] || null }))}
+                                  />
+                                  {(p as any).pdfPath ? (
+                                    <div style={{ marginTop: 8 }}>
+                                      <button type="button" className="btn-outline" onClick={() => openPdfWithAuth(p as any)}>
+                                        Open current PDF
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </label>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {selectedMine && openMineId != null && editingId == null ? (
+                  <div className="card" style={{ padding: 16, marginTop: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                      <strong>Publication details</strong>
+                      <button type="button" className="btn-outline" onClick={() => setOpenMineId(null)}>
+                        Close
+                      </button>
+                    </div>
+
+                    <div style={{ marginTop: 12 }}>
+                      <div className="muted" style={{ marginBottom: 6 }}>
+                        Title
+                      </div>
+                      <div>
+                        <strong>{(selectedMine as any).title || "-"}</strong>
+                      </div>
+
+                      {renderChips(selectedMine as any)}
+
+                      {(selectedMine as any).authors ? (
+                        <div style={{ marginTop: 10 }}>
+                          <span className="k">Authors:</span> {(selectedMine as any).authors}
+                        </div>
+                      ) : null}
+
+                      {(selectedMine as any).keywords ? (
+                        <div style={{ marginTop: 6 }}>
+                          <span className="k">Keywords:</span> {(selectedMine as any).keywords}
+                        </div>
+                      ) : null}
+
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
+                        {(selectedMine as any).externalLink ? (
+                          <a className="annPill" href={toUrl((selectedMine as any).externalLink)} target="_blank" rel="noreferrer">
+                            External link
                           </a>
                         ) : null}
-                      </>
-                    )}
+
+                        {(selectedMine as any).pdfPath ? (
+                          <button type="button" className="btn-outline" onClick={() => openPdfWithAuth(selectedMine as any)}>
+                            Open PDF
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
-                ))
+                ) : null}
+              </>
+            )}
+          </>
+        )}
+
+        {tab === "EXPLORE" && (
+          <div className="card" style={{ padding: 16 }}>
+            <div className="twoCol">
+              <div>
+                <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  Search publications
+                  <input
+                    className="ecoInput"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Search by title, authors, journal, DOI, user…"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") loadExplore(0);
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 10, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => {
+                    setQ("");
+                    loadExplore(0);
+                  }}
+                  disabled={exploreLoading}
+                >
+                  Reset
+                </button>
+
+                <button type="button" className="btn-primary" onClick={() => loadExplore(0)} disabled={exploreLoading}>
+                  {exploreLoading ? "Searching…" : "Search"}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 14 }}>
+              {exploreLoading && !explore ? (
+                <div className="muted">Loading…</div>
+              ) : !explore || explore.items.length === 0 ? (
+                <div className="muted">No results.</div>
               ) : (
-                <div className="muted">No publications yet.</div>
+                <>
+                  <div className="annList">
+                    {explore.items.map((p) => {
+                      const isOpen = openExploreId === p.id;
+                      const owner = joinName((p as any).userFirstName, (p as any).userLastName) || "Unknown user";
+
+                      return (
+                        <div
+                          key={p.id}
+                          className="projectItem"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setOpenExploreId((cur) => (cur === p.id ? null : p.id))}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setOpenExploreId((cur) => (cur === p.id ? null : p.id));
+                            }
+                          }}
+                          style={{ cursor: "pointer" }}
+                        >
+                          <div className="projectTop">
+                            <div className="projectTitle">
+                              <strong>{(p as any).title}</strong>
+                              <span className="projectMeta">{prettyType((p as any).type)}</span>
+                            </div>
+
+                            <div className="muted" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                              <span>
+                                {owner}
+                                <span style={{ marginLeft: 10, opacity: 0.8 }}>{isOpen ? "▲" : "▼"}</span>
+                              </span>
+
+                              {isAdmin ? (
+                                <button
+                                  type="button"
+                                  className="btn-outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    requestDeleteExploreAdmin(p);
+                                  }}
+                                  disabled={saving}
+                                  title="Admin delete"
+                                >
+                                  Delete
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="projectDetails">{renderChips(p as any)}</div>
+
+                          {isOpen && (
+                            <div className="projectDetails" style={{ marginTop: 10 }}>
+                              {(p as any).authors ? (
+                                <div>
+                                  <span className="k">Authors:</span> {(p as any).authors}
+                                </div>
+                              ) : null}
+
+                              {(p as any).externalLink ? (
+                                <div style={{ marginTop: 8 }}>
+                                  <a
+                                    className="annInlineLink"
+                                    href={toUrl((p as any).externalLink)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Open link
+                                  </a>
+                                </div>
+                              ) : null}
+
+                              {(p as any).pdfPath ? (
+                                <div style={{ marginTop: 8 }}>
+                                  <button
+                                    type="button"
+                                    className="btn-outline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openPdfWithAuth(p as any);
+                                    }}
+                                  >
+                                    Open PDF
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="annMore">
+                    <button
+                      type="button"
+                      className="btn-outline"
+                      onClick={() => loadExplore(Math.max(0, page - 1))}
+                      disabled={exploreLoading || page <= 0}
+                    >
+                      Prev
+                    </button>
+
+                    <div style={{ width: 10 }} />
+
+                    <button
+                      type="button"
+                      className="btn-outline"
+                      onClick={() => loadExplore(page + 1)}
+                      disabled={exploreLoading || (explore && page >= (explore.totalPages || 1) - 1)}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
-
-          {/* EXPLORE GLOBAL */}
-          <div className="card" style={{ padding: 18 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <strong>Explore</strong>
-              <span className="muted">Search by user name or publication title</span>
-            </div>
-
-            <input
-              className="ecoInput"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search: user name, title, venue, year..."
-              style={{ marginTop: 12 }}
-            />
-
-            <div className="listGrid" style={{ marginTop: 12 }}>
-              {globalLoading && global.length === 0 ? <div className="muted">Loading...</div> : null}
-
-              {global.map((p) => (
-                <div className="annListItem" key={`g-${p.id}`}>
-                  <div className="annListTop">
-                    <div className="itemTitle">
-                      <strong>{p.title}</strong>
-                    </div>
-                    {p.url?.trim() ? (
-                      <a className="annInlineLink" href={toUrl(p.url)} target="_blank" rel="noreferrer">
-                        Open
-                      </a>
-                    ) : null}
-                  </div>
-
-                  <div className="itemMetaRow">
-                    <span className="chip">
-                      {(p.userFirstName || p.userLastName)
-                        ? `${p.userFirstName || ""} ${p.userLastName || ""}`.trim()
-                        : "Unknown user"}
-                    </span>
-                    {p.userRole ? <span className="chip">{p.userRole}</span> : null}
-                    {p.venue ? <span className="chip">{p.venue}</span> : null}
-                    {p.year ? <span className="chip">{p.year}</span> : null}
-                  </div>
-                </div>
-              ))}
-
-              {!globalLoading && global.length === 0 ? <div className="muted">No results.</div> : null}
-            </div>
-
-            <div className="annMore" style={{ marginTop: 12 }}>
-              <button
-                className="btn-outline"
-                type="button"
-                onClick={() => loadGlobal(page + 1, false)}
-                disabled={!canLoadMore || globalLoading}
-              >
-                {globalLoading ? "Loading..." : canLoadMore ? "Load more" : "No more"}
-              </button>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
+
+      <ConfirmModal
+        open={confirm.open}
+        title={confirm.mode === "EXPLORE_ADMIN" ? "Delete publication (admin)" : "Delete publication"}
+        message={`Delete "${confirm.label}"? This can't be undone.`}
+        confirmText={saving ? "Deleting..." : "Delete"}
+        cancelText="Cancel"
+        danger
+        busy={saving}
+        onCancel={() => setConfirm({ open: false, mode: "MINE", id: null, label: "" })}
+        onConfirm={confirmDeleteNow}
+      />
     </div>
   );
 }

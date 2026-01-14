@@ -10,34 +10,49 @@ export type ProjectDto = {
   userRole?: string;
 
   title: string;
-  description?: string;
+  acronym: string;
+  abstractEn?: string;
+  partners?: string;
+  coordinator?: string;
+  contractNumber: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  possibleExtensionEndDate?: string | null;
+
   url?: string;
 };
 
-
 export type ProjectRequest = {
   title: string;
-  description?: string;
+  acronym: string;
+  abstractEn?: string;
+  partners?: string;
+  coordinator?: string;
+  contractNumber: string;
+  startDate: string;
+  endDate: string;
+  possibleExtensionEndDate?: string | null;
+
   url?: string;
 };
 
 export const getMyProjects = async (): Promise<ProjectDto[]> => {
-  const res = await api.get("/api/projects/me");
+  const res = await api.get<ProjectDto[]>("/api/projects/me");
   return res.data;
 };
 
 export const getProjectsByUserId = async (userId: number): Promise<ProjectDto[]> => {
-  const res = await api.get(`/api/projects/user/${userId}`);
+  const res = await api.get<ProjectDto[]>(`/api/projects/user/${userId}`);
   return res.data;
 };
 
 export const createProject = async (payload: ProjectRequest): Promise<ProjectDto> => {
-  const res = await api.post("/api/projects/me", payload);
+  const res = await api.post<ProjectDto>("/api/projects/me", payload);
   return res.data;
 };
 
 export const updateProject = async (id: number, payload: ProjectRequest): Promise<ProjectDto> => {
-  const res = await api.put(`/api/projects/me/${id}`, payload);
+  const res = await api.put<ProjectDto>(`/api/projects/me/${id}`, payload);
   return res.data;
 };
 
@@ -45,7 +60,13 @@ export const deleteProject = async (id: number): Promise<void> => {
   await api.delete(`/api/projects/me/${id}`);
 };
 
-export const getAllProjects = async (q: string, page = 0, size = 20): Promise<PageResponse<ProjectDto>> => {
-  const res = await api.get("/api/projects", { params: { q, page, size } });
+export const getAllProjects = async (q = "", page = 0, size = 12): Promise<PageResponse<ProjectDto>> => {
+  const res = await api.get<PageResponse<ProjectDto>>("/api/projects", {
+    params: { q: q || undefined, page, size }
+  });
   return res.data;
+};
+
+export const deleteProjectAdmin = async (id: number): Promise<void> => {
+  await api.delete(`/api/projects/${id}`);
 };

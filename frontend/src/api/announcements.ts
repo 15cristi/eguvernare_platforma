@@ -46,3 +46,7 @@ export async function addAnnouncementComment(postId: number, content: string): P
   const res = await api.post(`/api/announcements/${postId}/comments`, { content });
   return res.data;
 }
+
+export const deleteAnnouncement = async (postId: number): Promise<void> => {
+  await api.delete(`/api/announcements/${postId}`);
+};

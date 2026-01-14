@@ -1,14 +1,16 @@
 import "./Announcements.css";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import {
   addAnnouncementComment,
   createAnnouncement,
+  deleteAnnouncement,
   getAnnouncementsFeed,
   toggleAnnouncementLike,
   type PostDto
 } from "../api/announcements";
 import { uploadAvatarToCloudinary } from "../api/cloudinary";
 import { getProfileByUserId } from "../api/profile";
+import { AuthContext } from "../context/AuthContext";
 
 type PublicProfile = {
   headline?: string;
@@ -40,7 +42,12 @@ type PublicProfile = {
   avatarUrl?: string;
 };
 
+type Toast = { id: number; type: "success" | "error" | "info"; message: string };
+
 export default function Announcements() {
+  const { user } = useContext(AuthContext);
+  const isAdmin = (user?.role || "").toUpperCase() === "ADMIN";
+
   const [posts, setPosts] = useState<PostDto[]>([]);
   const [page, setPage] = useState(0);
 
@@ -55,6 +62,26 @@ export default function Announcements() {
   const [imageUploading, setImageUploading] = useState(false);
 
   const [busyPostId, setBusyPostId] = useState<number | null>(null);
+  const [deletingPostId, setDeletingPostId] = useState<number | null>(null);
+
+  // confirm delete modal state
+  const [confirmDelete, setConfirmDelete] = useState<{
+    open: boolean;
+    postId: number | null;
+    title: string;
+  }>({ open: false, postId: null, title: "" });
+
+  // toast state
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastSeq = useRef(1);
+
+  const pushToast = (type: Toast["type"], message: string) => {
+    const id = toastSeq.current++;
+    setToasts((t) => [...t, { id, type, message }]);
+    window.setTimeout(() => {
+      setToasts((t) => t.filter((x) => x.id !== id));
+    }, 2800);
+  };
 
   const [profileUser, setProfileUser] = useState<{ id: number; name: string; role: string } | null>(null);
   const [profileData, setProfileData] = useState<PublicProfile | null>(null);
@@ -113,6 +140,9 @@ export default function Announcements() {
       });
 
       setPage(nextPage);
+    } catch (e) {
+      console.error(e);
+      pushToast("error", "Failed to load announcements.");
     } finally {
       loadingRef.current = false;
       setLoading(false);
@@ -137,6 +167,15 @@ export default function Announcements() {
     return () => window.removeEventListener("keydown", onKey);
   }, [profileUser]);
 
+  useEffect(() => {
+    if (!confirmDelete.open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirmDelete({ open: false, postId: null, title: "" });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirmDelete.open]);
+
   const refresh = async () => {
     await loadPage(0, "replace");
   };
@@ -152,12 +191,12 @@ export default function Announcements() {
     if (!file) return clearImage();
 
     if (!file.type.startsWith("image/")) {
-      alert("Please choose an image file.");
+      pushToast("error", "Please choose an image file.");
       return clearImage();
     }
 
     if (file.size > 8 * 1024 * 1024) {
-      alert("Image is too large (max 8MB).");
+      pushToast("error", "Image is too large (max 8MB).");
       return clearImage();
     }
 
@@ -190,16 +229,18 @@ export default function Announcements() {
 
       setDraft("");
       clearImage();
+
+      pushToast("success", "Posted.");
     } catch (e) {
       console.error(e);
-      alert("Failed to post");
+      pushToast("error", "Failed to post.");
     } finally {
       setPosting(false);
     }
   };
 
   const onToggleLike = async (postId: number) => {
-    if (busyPostId) return;
+    if (busyPostId || deletingPostId) return;
     setBusyPostId(postId);
 
     setPosts((prev) =>
@@ -225,17 +266,50 @@ export default function Announcements() {
     const c = content.trim();
     if (!c) return;
 
-    if (busyPostId) return;
+    if (busyPostId || deletingPostId) return;
     setBusyPostId(postId);
 
     try {
       await addAnnouncementComment(postId, c);
       await refresh();
+      pushToast("success", "Comment added.");
     } catch (e) {
       console.error(e);
-      alert("Failed to comment");
+      pushToast("error", "Failed to comment.");
     } finally {
       setBusyPostId(null);
+    }
+  };
+
+  const requestDelete = (postId: number) => {
+    if (!isAdmin) return;
+    const post = posts.find((p) => p.id === postId);
+    const title = post?.content?.trim()
+      ? post.content.trim().slice(0, 60) + (post.content.trim().length > 60 ? "…" : "")
+      : "this post";
+
+    setConfirmDelete({ open: true, postId, title });
+  };
+
+  const confirmDeleteNow = async () => {
+    if (!isAdmin) return;
+    const postId = confirmDelete.postId;
+    if (!postId) return;
+
+    if (deletingPostId) return;
+
+    setConfirmDelete({ open: false, postId: null, title: "" });
+    setDeletingPostId(postId);
+
+    try {
+      await deleteAnnouncement(postId);
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      pushToast("success", "Post deleted.");
+    } catch (e: any) {
+      console.error(e);
+      pushToast("error", e?.response?.data?.message ?? "Failed to delete post.");
+    } finally {
+      setDeletingPostId(null);
     }
   };
 
@@ -245,6 +319,8 @@ export default function Announcements() {
 
   return (
     <div className="annShell">
+      <ToastStack toasts={toasts} onClose={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
+
       <div className="annPage">
         <div className="annHeader">
           <div>
@@ -313,20 +389,18 @@ export default function Announcements() {
             <PostCard
               key={p.id}
               post={p}
-              busy={busyPostId === p.id}
+              busy={busyPostId === p.id || deletingPostId === p.id}
+              isAdmin={isAdmin}
+              deleting={deletingPostId === p.id}
               onLike={() => onToggleLike(p.id)}
               onComment={(text) => onAddComment(p.id, text)}
+              onDelete={() => requestDelete(p.id)}
               onOpenProfile={(u) => openProfile(u.id, `${u.firstName} ${u.lastName}`, u.role)}
             />
           ))}
 
           <div className="annMore">
-            <button
-              className="btn-outline"
-              type="button"
-              onClick={() => loadPage(page + 1, "append")}
-              disabled={loadingMore}
-            >
+            <button className="btn-outline" type="button" onClick={() => loadPage(page + 1, "append")} disabled={loadingMore}>
               {loadingMore ? "Loading..." : "Load more"}
             </button>
           </div>
@@ -368,6 +442,18 @@ export default function Announcements() {
           onClose={closeProfile}
         />
       )}
+
+      <ConfirmModal
+        open={confirmDelete.open}
+        title="Delete post"
+        message={`Delete "${confirmDelete.title}"? This can't be undone.`}
+        confirmText={deletingPostId ? "Deleting..." : "Delete"}
+        cancelText="Cancel"
+        danger
+        busy={!!deletingPostId}
+        onCancel={() => setConfirmDelete({ open: false, postId: null, title: "" })}
+        onConfirm={confirmDeleteNow}
+      />
     </div>
   );
 }
@@ -375,14 +461,20 @@ export default function Announcements() {
 function PostCard({
   post,
   busy,
+  isAdmin,
+  deleting,
   onLike,
   onComment,
+  onDelete,
   onOpenProfile
 }: {
   post: PostDto;
   busy: boolean;
+  isAdmin: boolean;
+  deleting: boolean;
   onLike: () => void;
   onComment: (text: string) => void;
+  onDelete: () => void;
   onOpenProfile: (u: PostDto["author"]) => void;
 }) {
   const [c, setC] = useState("");
@@ -407,7 +499,15 @@ function PostCard({
           </div>
         </button>
 
-        <div className="muted">{new Date(post.createdAt).toLocaleString()}</div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div className="muted">{new Date(post.createdAt).toLocaleString()}</div>
+
+          {isAdmin ? (
+            <button className="btn-outline" type="button" onClick={onDelete} disabled={busy || deleting} title="Delete post">
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {post.content?.trim() ? <div className="annContent">{post.content}</div> : null}
@@ -470,12 +570,7 @@ function PostCard({
                 <div className="annComment" key={cm.id}>
                   <div className="avatarSmall" />
                   <div className="annCommentBody">
-                    <button
-                      className="annInlineLink"
-                      type="button"
-                      onClick={() => onOpenProfile(cm.author)}
-                      title="View profile"
-                    >
+                    <button className="annInlineLink" type="button" onClick={() => onOpenProfile(cm.author)} title="View profile">
                       <strong>
                         {cm.author.firstName} {cm.author.lastName}
                       </strong>
@@ -487,6 +582,82 @@ function PostCard({
               ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ToastStack({ toasts, onClose }: { toasts: Toast[]; onClose: (id: number) => void }) {
+  if (!toasts.length) return null;
+
+  return (
+    <div className="annToastStack" aria-live="polite">
+      {toasts.map((t) => (
+        <div key={t.id} className={`annToast annToast-${t.type}`} role="status">
+          <div className="annToastMsg">{t.message}</div>
+          <button className="annToastClose" type="button" onClick={() => onClose(t.id)} aria-label="Close">
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConfirmModal({
+  open,
+  title,
+  message,
+  confirmText,
+  cancelText,
+  danger,
+  busy,
+  onCancel,
+  onConfirm
+}: {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  cancelText: string;
+  danger?: boolean;
+  busy?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="annConfirmOverlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div className="annConfirmModal card" role="dialog" aria-modal="true">
+        <div className="annConfirmHead">
+          <h3 className="annConfirmTitle">{title}</h3>
+          <button className="btn-outline annConfirmClose" type="button" onClick={onCancel} disabled={busy}>
+            ×
+          </button>
+        </div>
+
+        <div className="annConfirmMsg">{message}</div>
+
+        <div className="annConfirmActions">
+          <button className="btn-outline" type="button" onClick={onCancel} disabled={busy}>
+            {cancelText}
+          </button>
+
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className={danger ? "annDangerBtn" : "annPrimaryBtn"}
+          >
+            {confirmText}
+          </button>
+        </div>
       </div>
     </div>
   );

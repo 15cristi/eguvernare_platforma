@@ -10,12 +10,14 @@ import { SinglePicker } from "../components/SinglePicker";
 type Availability = "FULL_TIME" | "PART_TIME" | "WEEKENDS";
 type ExperienceLevel = "JUNIOR" | "MID" | "SENIOR";
 
-interface ExpertiseItem {
+type IdItem = { id: string };
+
+interface ExpertiseItem extends IdItem {
   area: string;
   description: string;
 }
 
-interface ResourceItem {
+interface ResourceItem extends IdItem {
   title: string;
   description: string;
   url: string;
@@ -59,6 +61,10 @@ const norm = (s: string) => s.trim().replace(/\s+/g, " ");
 const suggest = (category: LookupCategory, q: string) => suggestLookup(category, q);
 const upsert = (category: LookupCategory, value: string) => upsertLookup(category, value);
 
+// Stable id generator (works in modern browsers; fallback included)
+const makeId = () =>
+  (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `id_${Date.now()}_${Math.random()}`);
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [saving, setSaving] = useState(false);
@@ -67,6 +73,29 @@ export default function ProfilePage() {
   useEffect(() => {
     getMyProfile()
       .then((data) => {
+        const expertiseFromApi: any[] = data.expertise || [];
+        const resourcesFromApi: any[] = data.resources || [];
+
+        const expertise: ExpertiseItem[] =
+          expertiseFromApi.length > 0
+            ? expertiseFromApi.map((x: any) => ({
+                id: x.id || makeId(),
+                area: x.area || "",
+                description: x.description || ""
+              }))
+            : (data.expertAreas || []).map((a: string) => ({
+                id: makeId(),
+                area: a,
+                description: ""
+              }));
+
+        const resources: ResourceItem[] = resourcesFromApi.map((x: any) => ({
+          id: x.id || makeId(),
+          title: x.title || "",
+          description: x.description || "",
+          url: x.url || ""
+        }));
+
         setProfile({
           headline: data.headline || "",
           bio: data.bio || "",
@@ -79,8 +108,8 @@ export default function ProfilePage() {
           faculty: data.faculty || "",
 
           expertAreas: data.expertAreas || [],
-          expertise: data.expertise || (data.expertAreas || []).map((a: string) => ({ area: a, description: "" })),
-          resources: data.resources || [],
+          expertise,
+          resources,
 
           companyName: data.companyName || "",
           companyDescription: data.companyDescription || "",
@@ -163,6 +192,7 @@ export default function ProfilePage() {
         safeUpsert("PROFESSION", profile.profession)
       ]);
 
+      // IMPORTANT: we keep ids only on the client side. Send only what backend expects.
       const payload = {
         headline: profile.headline,
         bio: profile.bio,
@@ -174,8 +204,8 @@ export default function ProfilePage() {
         faculty: profile.faculty,
 
         expertAreas: profile.expertAreas,
-        expertise: profile.expertise,
-        resources: profile.resources,
+        expertise: profile.expertise.map((x) => ({ area: x.area, description: x.description })),
+        resources: profile.resources.map((x) => ({ title: x.title, description: x.description, url: x.url })),
 
         companyName: profile.companyName,
         companyDescription: profile.companyDescription,
@@ -497,7 +527,7 @@ function ExpertiseEditor({ items, onChange }: ExpertiseEditorProps) {
     onChange(next);
   };
 
-  const add = () => onChange([...(items || []), { area: "", description: "" }]);
+  const add = () => onChange([...(items || []), { id: makeId(), area: "", description: "" }]);
   const remove = (idx: number) => onChange(items.filter((_, i) => i !== idx));
 
   return (
@@ -505,7 +535,7 @@ function ExpertiseEditor({ items, onChange }: ExpertiseEditorProps) {
       {items.length === 0 && <small className="hint">Add at least one area so others can find you.</small>}
 
       {items.map((it, idx) => (
-        <div key={`${it.area}-${idx}`} className="subcard">
+        <div key={it.id} className="subcard">
           <SinglePicker
             label="Expert area"
             category="EXPERT_AREA"
@@ -546,7 +576,7 @@ function ResourcesEditor({ items, onChange }: ResourcesEditorProps) {
     onChange(next);
   };
 
-  const add = () => onChange([...(items || []), { title: "", description: "", url: "" }]);
+  const add = () => onChange([...(items || []), { id: makeId(), title: "", description: "", url: "" }]);
   const remove = (idx: number) => onChange(items.filter((_, i) => i !== idx));
 
   return (
@@ -554,7 +584,7 @@ function ResourcesEditor({ items, onChange }: ResourcesEditorProps) {
       {items.length === 0 && <small className="hint">Optional: add links to labs, tools, papers, or repositories.</small>}
 
       {items.map((it, idx) => (
-        <div key={`${it.title}-${idx}`} className="subcard">
+        <div key={it.id} className="subcard">
           <div className="row">
             <label>
               Title

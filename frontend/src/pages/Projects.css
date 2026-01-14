@@ -1,0 +1,24 @@
+.projects-page { padding: 32px; }
+.projects-header { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:16px; }
+
+.card { border-radius: 16px; padding: 16px; border: 1px solid rgba(0,0,0,.08); background: #fff; }
+
+.projForm { display:flex; flex-direction:column; gap:14px; }
+.projGrid2 { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+.projCheck { display:flex; align-items:center; gap:10px; font-weight:600; }
+
+.projects-list { display:flex; flex-direction:column; gap:12px; margin-top: 12px; }
+.projectItem { border:1px solid rgba(0,0,0,.08); border-radius:14px; padding:12px; }
+.projectTop { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+.projectMeta { margin-left: 10px; opacity: .7; }
+.projectActions { display:flex; gap:10px; }
+
+.k { opacity:.7; margin-right:6px; }
+
+.btn-primary { padding:10px 14px; border-radius:12px; border:none; cursor:pointer; }
+.btn-secondary { padding:10px 14px; border-radius:12px; border:1px solid rgba(0,0,0,.15); cursor:pointer; background:transparent; }
+.btn-danger { padding:10px 14px; border-radius:12px; border:none; cursor:pointer; }
+
+@media (max-width: 900px) {
+  .projGrid2 { grid-template-columns: 1fr; }
+}
