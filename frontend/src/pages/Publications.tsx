@@ -15,6 +15,8 @@ import {
   type PublicationType
 } from "../api/publications";
 import type { PageResponse } from "../api/types";
+import { useNavigate } from "react-router-dom";
+import { getOrCreateDirectConversation } from "../api/messages";
 
 const norm = (s?: string | null) => (s || "").trim().replace(/\s+/g, " ");
 
@@ -263,6 +265,31 @@ function ConfirmModal({
 }
 
 export default function PublicationsPage() {
+   const nav = useNavigate();
+
+  const onMessageUser = async (otherUserId?: number | null) => {
+    if (!otherUserId) {
+      pushToast("error", "User id missing for this publication.");
+      return;
+    }
+
+    if (auth.userId && otherUserId === auth.userId) {
+      pushToast("info", "You can’t send a message to yourself.");
+      return;
+    }
+
+    try {
+      const { conversationId } = await getOrCreateDirectConversation(otherUserId);
+      nav(`/messages?c=${conversationId}`);
+    } catch (e: any) {
+      const backendMsg = String(e?.response?.data?.message || "");
+      if (backendMsg.toLowerCase().includes("yourself")) {
+        pushToast("info", "You can’t send a message to yourself.");
+      } else {
+        pushToast("error", "You can’t send a message to yourself.");
+      }
+    }
+  };
   const [tab, setTab] = useState<Tab>("MINE");
 
   const [items, setItems] = useState<PublicationDto[]>([]);
@@ -1154,6 +1181,14 @@ export default function PublicationsPage() {
                       const isOpen = openExploreId === p.id;
                       const owner = joinName((p as any).userFirstName, (p as any).userLastName) || "Unknown user";
 
+                       const ownerId =
+                        (p as any).userId ||
+                        (p as any).ownerId ||
+                        (p as any).createdById;
+
+                      const canMessage = !!ownerId && ownerId !== auth.userId;
+
+
                       return (
                         <div
                           key={p.id}
@@ -1180,6 +1215,20 @@ export default function PublicationsPage() {
                                 {owner}
                                 <span style={{ marginLeft: 10, opacity: 0.8 }}>{isOpen ? "▲" : "▼"}</span>
                               </span>
+                              {canMessage && (
+                              <button
+                                type="button"
+                                className="btn-outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onMessageUser(ownerId);
+                                }}
+                                disabled={saving}
+                                title="Message author"
+                              >
+                                Message
+                              </button>
+                            )}
 
                               {isAdmin ? (
                                 <button

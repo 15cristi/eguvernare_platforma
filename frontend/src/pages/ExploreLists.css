@@ -99,9 +99,11 @@
   font-size: 13px;
   margin-top: 6px;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+
+  line-clamp: 3;          
+  -webkit-line-clamp: 3;  
 }
 
 .itemMetaRow {
@@ -113,7 +115,7 @@
 }
 
 .chip {
-  display: inline-flex;
+  display: inline-flex;               
   align-items: center;
   padding: 5px 10px;
   border-radius: 999px;

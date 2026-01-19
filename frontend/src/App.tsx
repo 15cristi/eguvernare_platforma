@@ -8,6 +8,8 @@ import ProtectedLayout from "./layouts/ProtectedLayout";
 import Announcements from "./pages/Announcements";
 import Projects from "./pages/Projects";
 import Publications from "./pages/Publications";
+import Messages from "./pages/Messages";
+
 function App() {
   return (
     <Routes>
@@ -21,6 +23,8 @@ function App() {
         <Route path="/announcements" element={<Announcements />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/publications" element={<Publications />} />
+        <Route path="/Messages" element={<Messages />} />
+
       </Route>
     </Routes>
   );

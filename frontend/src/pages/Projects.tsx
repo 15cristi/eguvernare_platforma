@@ -11,6 +11,8 @@ import {
   type ProjectRequest
 } from "../api/projects";
 import type { PageResponse } from "../api/types";
+import { useNavigate } from "react-router-dom";
+import { getOrCreateDirectConversation } from "../api/messages";
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ");
 
@@ -210,6 +212,36 @@ function ConfirmModal({
 }
 
 export default function ProjectsPage() {
+  const nav = useNavigate();
+
+  const onMessageUser = async (otherUserId?: number | null) => {
+    if (!otherUserId) {
+      pushToast("error", "User id missing for this project.");
+      return;
+    }
+
+    try {
+      const { conversationId } = await getOrCreateDirectConversation(otherUserId);
+      nav(`/messages?c=${conversationId}`);
+    } catch (e: any) {
+  const status = e?.response?.status;
+  const apiMsg = (e?.response?.data?.message ?? "").toString().toLowerCase();
+
+  if (status === 400 && (apiMsg.includes("yourself") || apiMsg.includes("self"))) {
+    pushToast("info", "You can’t send a message to yourself.");
+    return;
+  }
+
+  if (status === 401) {
+    pushToast("error", "Your session has expired. Please sign in again.");
+    return;
+  }
+
+  pushToast("error", "You can’t send a message to yourself.");
+}
+
+  };
+
   const [tab, setTab] = useState<Tab>("MINE");
 
   const [items, setItems] = useState<ProjectDto[]>([]);
@@ -242,6 +274,9 @@ export default function ProjectsPage() {
     window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2800);
   };
 
+
+
+  
   // Confirm state
   const [confirm, setConfirm] = useState<{
     open: boolean;
@@ -881,6 +916,12 @@ export default function ProjectsPage() {
                   <div className="annList">
                     {explore.items.map((p) => {
                       const isOpen = openExploreId === p.id;
+                      const ownerId =
+                      (p as any).userId ||
+                      (p as any).ownerId ||
+                      (p as any).createdById;
+
+                    const canMessage = ownerId && ownerId !== auth.userId;
 
                       return (
                         <div
@@ -908,6 +949,21 @@ export default function ProjectsPage() {
                                 {(p.userFirstName || "")} {(p.userLastName || "")}
                                 <span style={{ marginLeft: 10, opacity: 0.8 }}>{isOpen ? "▲" : "▼"}</span>
                               </span>
+
+                              {canMessage ? (
+                              <button
+                                type="button"
+                                className="btn-outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onMessageUser(ownerId);
+                                }}
+                                disabled={saving}
+                                title="Message author"
+                              >
+                                Message
+                              </button>
+                            ) : null}
 
                               {isAdmin ? (
                                 <button

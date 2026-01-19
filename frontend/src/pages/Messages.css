@@ -1,0 +1,539 @@
+/* ====== Layout ====== */
+.msgLayout {
+  display: grid;
+  grid-template-columns: 360px 1fr 360px;
+  gap: 16px;
+  align-items: stretch;
+
+  /* IMPORTANT: keep page fixed, scroll inside panels */
+  height: calc(100vh - 24px);
+  overflow: hidden;
+}
+
+.msgCol {
+  display: flex;
+  flex-direction: column;
+
+  /* IMPORTANT: allow children to overflow/scroll */
+  min-height: 0;
+}
+
+/* columns */
+.msgColLeft,
+.msgColRight,
+.msgColMid {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  /* IMPORTANT in grid */
+  min-height: 0;
+}
+
+/* ====== Headers ====== */
+.msgHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.msgHeader h2 {
+  color: #ffffff;
+}
+
+.msgChatHead {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.msgChatHead h2 {
+  color: #ffffff;
+}
+
+.msgChatActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.msgSub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.msgError {
+  padding: 10px 12px;
+  margin: 10px 12px 0;
+  border: 1px solid rgba(255, 120, 120, 0.35);
+  border-radius: 12px;
+  background: rgba(255, 120, 120, 0.08);
+  color: #ffd6d6;
+  font-size: 13px;
+}
+
+.msgEmpty {
+  padding: 16px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.msgHint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ====== Search (left) ====== */
+.msgSearch {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.msgSearchInput {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: #ffffff;
+  outline: none;
+}
+
+.msgSearchInput::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ====== Left list ====== */
+.msgList {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  /* scroll inside left panel */
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.msgItem {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.msgItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.msgItem.active {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.msgAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  background-size: cover;
+  background-position: center;
+  flex: 0 0 auto;
+}
+
+.msgItemBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.msgItemTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.msgName {
+  font-weight: 700;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msgRole {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  flex: 0 0 auto;
+}
+
+.msgPreview {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ====== Middle chat ====== */
+.msgChatBody {
+  /* THIS is the scroll container */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding: 12px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* message row wrapper (optional, but keeps future styling easy) */
+.msgRow {
+  display: flex;
+  flex-direction: column;
+}
+
+.msgBubble {
+  max-width: 70%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  white-space: pre-wrap;
+}
+
+.msgBubble.me {
+  align-self: flex-end;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.msgBubble.them {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Meta line (LinkedIn-ish) */
+.msgMetaLine {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.msgMetaName {
+  font-weight: 800;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.msgMetaDot {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+}
+
+.msgMetaTime {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.msgBubbleText {
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+/* attachments */
+.msgAttachments {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.msgAttachment {
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  color: #ffffff;
+}
+
+.msgAttachmentTop {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.msgAttachmentName {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.msgAttachmentMeta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ====== Composer ====== */
+.msgComposer {
+  flex: 0 0 auto;
+  padding: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.msgComposerTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.msgHidden {
+  display: none;
+}
+
+.msgFilePill {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.msgFileName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #ffffff;
+}
+
+.msgFileMeta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+  flex: 0 0 auto;
+}
+
+.msgFileRemove {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.msgComposerBottom {
+  display: flex;
+  gap: 10px;
+}
+
+.msgInput {
+  flex: 1;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: #ffffff;
+  outline: none;
+}
+
+.msgInput::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ====== Right details ====== */
+.msgDetails {
+  padding: 12px;
+
+  /* scroll inside right panel */
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.msgDetailsTop {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.msgDetailsAvatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  background-size: cover;
+  background-position: center;
+  flex: 0 0 auto;
+}
+
+.msgDetailsName {
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.msgHeadline {
+  margin-top: 10px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.msgBio {
+  margin-top: 10px;
+  white-space: pre-wrap;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.msgKv {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.msgKvRow {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+}
+
+.msgKvKey {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.msgKvVal {
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.msgLinks {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.msgLink {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 8px 10px;
+  text-decoration: none;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.msgLink:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* ====== Toast ====== */
+.annToastStack {
+  position: fixed;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  width: min(520px, calc(100vw - 24px));
+  pointer-events: none;
+}
+
+.annToast {
+  pointer-events: auto;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(30, 30, 30, 0.95);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: toastIn 180ms ease-out;
+}
+
+.annToastClose {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.annToastClose:hover {
+  color: #ffffff;
+}
+
+.annToast-info {
+  border-left: 4px solid #4da3ff;
+}
+
+.annToast-success {
+  border-left: 4px solid #3ddc97;
+}
+
+.annToast-error {
+  border-left: 4px solid #ff6b6b;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ====== Responsive ====== */
+@media (max-width: 1024px) {
+  .msgLayout {
+    grid-template-columns: 320px 1fr;
+  }
+  .msgColRight {
+    display: none;
+  }
+}
+
+@media (max-width: 740px) {
+  .msgLayout {
+    grid-template-columns: 1fr;
+  }
+  .msgColLeft {
+    display: none;
+  }
+}

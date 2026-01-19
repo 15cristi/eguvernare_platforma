@@ -26,3 +26,4 @@ export const uploadAvatarToCloudinary = async (file: File): Promise<string> => {
 
   return data.secure_url;
 };
+

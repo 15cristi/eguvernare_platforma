@@ -11,6 +11,8 @@ import {
 import { uploadAvatarToCloudinary } from "../api/cloudinary";
 import { getProfileByUserId } from "../api/profile";
 import { AuthContext } from "../context/AuthContext";
+import { getOrCreateDirectConversation } from "../api/messages";
+import { useNavigate } from "react-router-dom";
 
 type PublicProfile = {
   headline?: string;
@@ -46,6 +48,7 @@ type Toast = { id: number; type: "success" | "error" | "info"; message: string }
 
 export default function Announcements() {
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
   const isAdmin = (user?.role || "").toUpperCase() === "ADMIN";
 
   const [posts, setPosts] = useState<PostDto[]>([]);
@@ -64,14 +67,12 @@ export default function Announcements() {
   const [busyPostId, setBusyPostId] = useState<number | null>(null);
   const [deletingPostId, setDeletingPostId] = useState<number | null>(null);
 
-  // confirm delete modal state
   const [confirmDelete, setConfirmDelete] = useState<{
     open: boolean;
     postId: number | null;
     title: string;
   }>({ open: false, postId: null, title: "" });
 
-  // toast state
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastSeq = useRef(1);
 
@@ -313,6 +314,17 @@ export default function Announcements() {
     }
   };
 
+  const onMessageFromProfile = async (otherUserId: number) => {
+    try {
+      const { conversationId } = await getOrCreateDirectConversation(otherUserId);
+      closeProfile();
+      navigate(`/messages?c=${conversationId}`);
+    } catch (e) {
+      console.error(e);
+      pushToast("error", "Could not start conversation.");
+    }
+  };
+
   const totalPosts = posts.length;
   const totalLikes = posts.reduce((sum, p) => sum + (p.likeCount || 0), 0);
   const totalComments = posts.reduce((sum, p) => sum + (p.commentCount || 0), 0);
@@ -334,12 +346,7 @@ export default function Announcements() {
         </div>
 
         <div className="annComposer card">
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Share an update..."
-            rows={4}
-          />
+          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Share an update..." rows={4} />
 
           {imagePreview && (
             <div className="annImagePreview">
@@ -400,7 +407,12 @@ export default function Announcements() {
           ))}
 
           <div className="annMore">
-            <button className="btn-outline" type="button" onClick={() => loadPage(page + 1, "append")} disabled={loadingMore}>
+            <button
+              className="btn-outline"
+              type="button"
+              onClick={() => loadPage(page + 1, "append")}
+              disabled={loadingMore}
+            >
               {loadingMore ? "Loading..." : "Load more"}
             </button>
           </div>
@@ -440,6 +452,8 @@ export default function Announcements() {
           error={profileError}
           profile={profileData}
           onClose={closeProfile}
+          currentUserId={(user as any)?.id}
+          onMessage={onMessageFromProfile}
         />
       )}
 
@@ -649,12 +663,7 @@ function ConfirmModal({
             {cancelText}
           </button>
 
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={busy}
-            className={danger ? "annDangerBtn" : "annPrimaryBtn"}
-          >
+          <button type="button" onClick={onConfirm} disabled={busy} className={danger ? "annDangerBtn" : "annPrimaryBtn"}>
             {confirmText}
           </button>
         </div>
@@ -668,21 +677,24 @@ function ProfileModal({
   loading,
   error,
   profile,
-  onClose
+  onClose,
+  currentUserId,
+  onMessage
 }: {
   user: { id: number; name: string; role: string } | null;
   loading: boolean;
   error: string;
   profile: PublicProfile | null;
   onClose: () => void;
+  currentUserId?: number;
+  onMessage: (otherUserId: number) => void;
 }) {
   const p = profile;
   const title = user?.name || "Profile";
 
   const loc = [p?.city, p?.country].filter(Boolean).join(", ");
   const expertise = (p?.expertise && p.expertise.length > 0 ? p.expertise : null) || null;
-  const fallbackAreas =
-    !expertise && p?.expertAreas?.length ? p.expertAreas.map((a) => ({ area: a, description: "" })) : [];
+  const fallbackAreas = !expertise && p?.expertAreas?.length ? p.expertAreas.map((a) => ({ area: a, description: "" })) : [];
   const finalExpertise = expertise || fallbackAreas;
 
   const prettyEnum = (v?: string) => {
@@ -705,6 +717,8 @@ function ProfileModal({
     );
   };
 
+  const canMessage = !!user?.id && !!currentUserId && user.id !== currentUserId;
+
   return (
     <div
       className="annModalOverlay"
@@ -721,9 +735,18 @@ function ProfileModal({
               <div className="muted">{user?.role}</div>
             </div>
           </div>
-          <button className="btn-outline" type="button" onClick={onClose}>
-            Close
-          </button>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            {canMessage ? (
+              <button className="btn-primary" type="button" onClick={() => onMessage(user!.id)}>
+                Message
+              </button>
+            ) : null}
+
+            <button className="btn-outline" type="button" onClick={onClose}>
+              Close
+            </button>
+          </div>
         </div>
 
         {loading && <div className="muted">Loading…</div>}

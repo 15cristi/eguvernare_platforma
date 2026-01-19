@@ -72,6 +72,13 @@ export default function AppSidebar() {
             Announcements
           </NavLink>
 
+          <NavLink to="/messages" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+            <span className="nav-ico">💬</span>
+            Messages
+          </NavLink>
+
+
+
           <button className="nav-item ghost" type="button">
             <span className="nav-ico">🧰</span>
             Matching
