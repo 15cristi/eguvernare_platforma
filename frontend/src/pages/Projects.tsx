@@ -923,18 +923,166 @@ export default function ProjectsPage() {
                           </div>
                         </>
                       ) : (
-                        <form onSubmit={onSaveEdit} className="form">
-                          {/* păstrează edit-ul tău complet aici dacă vrei; butoanele sunt suficiente ca să nu crape */}
-                          <div className="actions">
-                            <button className="btn-outline" type="button" onClick={cancelEdit} disabled={saving}>
-                              Cancel
-                            </button>
-                            <button className="btn" type="submit" disabled={saving}>
-                              Save
+                      <form onSubmit={onSaveEdit} className="form">
+                        <div className="row2">
+                          <div>
+                            <div className="label">Title</div>
+                            <input
+                              className="ecoInput"
+                              value={editing.title}
+                              onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <div className="label">Acronym</div>
+                            <input
+                              className="ecoInput"
+                              value={editing.acronym}
+                              onChange={(e) => setEditing((d) => ({ ...d, acronym: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="row2">
+                          <div>
+                            <div className="label">Start date</div>
+                            <input
+                              type="date"
+                              className="ecoInput"
+                              value={editing.startDate}
+                              onChange={(e) => setEditing((d) => ({ ...d, startDate: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <div className="label">End date</div>
+                            <input
+                              type="date"
+                              className="ecoInput"
+                              value={editing.endDate}
+                              onChange={(e) => setEditing((d) => ({ ...d, endDate: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="row2">
+                          <div>
+                            <div className="label">Possible extension end</div>
+                            <input
+                              type="date"
+                              className="ecoInput"
+                              value={editing.possibleExtensionEndDate}
+                              onChange={(e) =>
+                                setEditing((d) => ({ ...d, possibleExtensionEndDate: e.target.value }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <div className="label">Contract number</div>
+                            <input
+                              className="ecoInput"
+                              value={editing.contractNumber}
+                              onChange={(e) => setEditing((d) => ({ ...d, contractNumber: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="row2">
+                          <div>
+                            <div className="label">Coordinator</div>
+                            <input
+                              className="ecoInput"
+                              value={editing.coordinator}
+                              onChange={(e) => setEditing((d) => ({ ...d, coordinator: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <div className="label">URL</div>
+                            <input
+                              className="ecoInput"
+                              value={editing.url}
+                              onChange={(e) => setEditing((d) => ({ ...d, url: e.target.value }))}
+                              placeholder="https://…"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Partners (multiple) */}
+                        <div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 6
+                            }}
+                          >
+                            <div className="label" style={{ margin: 0 }}>
+                              Partners
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-outline"
+                              onClick={() => setEditing((d) => ({ ...d, partners: [...d.partners, ""] }))}
+                            >
+                              + Add partner
                             </button>
                           </div>
-                        </form>
-                      )}
+
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {editing.partners.map((val, idx) => (
+                              <div key={idx} style={{ display: "flex", gap: 8 }}>
+                                <input
+                                  className="ecoInput"
+                                  value={val}
+                                  onChange={(e) =>
+                                    setEditing((d) => {
+                                      const next = [...d.partners];
+                                      next[idx] = e.target.value;
+                                      return { ...d, partners: next };
+                                    })
+                                  }
+                                  placeholder={idx === 0 ? "Partner" : `Partner #${idx + 1}`}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn-outline"
+                                  onClick={() =>
+                                    setEditing((d) => {
+                                      const next = d.partners.filter((_, i) => i !== idx);
+                                      return { ...d, partners: next.length ? next : [""] };
+                                    })
+                                  }
+                                  title="Remove"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="label">Abstract</div>
+                          <textarea
+                            className="ecoInput"
+                            value={editing.abstractEn}
+                            onChange={(e) => setEditing((d) => ({ ...d, abstractEn: e.target.value }))}
+                            rows={5}
+                          />
+                        </div>
+
+                        <div className="actions">
+                          <button className="btn-outline" type="button" onClick={cancelEdit} disabled={saving}>
+                            Cancel
+                          </button>
+                          <button className="btn" type="submit" disabled={saving}>
+                            Save
+                          </button>
+                        </div>
+                      </form>
+                    )
+                    }
                     </div>
                   );
                 })}
