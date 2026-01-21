@@ -3,6 +3,7 @@ package com.platforma.backend.project.dto;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -21,7 +22,7 @@ public class ProjectResponse {
     private String title;
     private String acronym;
     private String abstractEn;
-    private String partners;
+    private List<String> partners;
     private String coordinator;
     private String contractNumber;
 

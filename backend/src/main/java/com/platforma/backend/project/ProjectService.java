@@ -6,6 +6,7 @@ import com.platforma.backend.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.*;
+import java.util.stream.Collectors;
 
 import java.util.List;
 
@@ -29,7 +30,7 @@ public class ProjectService {
                 .title(safe(req.getTitle()))
                 .acronym(safe(req.getAcronym()))
                 .abstractEn(safe(req.getAbstractEn()))
-                .partners(safe(req.getPartners()))
+                .partners(safeList(req.getPartners()))
                 .coordinator(safe(req.getCoordinator()))
                 .contractNumber(safe(req.getContractNumber()))
                 .startDate(req.getStartDate())
@@ -63,7 +64,7 @@ public class ProjectService {
         if (req.getTitle() != null) p.setTitle(safe(req.getTitle()));
         if (req.getAcronym() != null) p.setAcronym(safe(req.getAcronym()));
         if (req.getAbstractEn() != null) p.setAbstractEn(safe(req.getAbstractEn()));
-        if (req.getPartners() != null) p.setPartners(safe(req.getPartners()));
+        if (req.getPartners() != null) p.setPartners(safeList(req.getPartners()));
         if (req.getCoordinator() != null) p.setCoordinator(safe(req.getCoordinator()));
         if (req.getContractNumber() != null) p.setContractNumber(safe(req.getContractNumber()));
         if (req.getStartDate() != null) p.setStartDate(req.getStartDate());
@@ -109,6 +110,15 @@ public class ProjectService {
         if (s == null) return null;
         String v = s.trim();
         return v.isEmpty() ? null : v;
+    }
+    private List<String> safeList(List<String> items) {
+        if (items == null) return new java.util.ArrayList<>();
+        List<String> cleaned = items.stream()
+                .map(this::safe)
+                .filter(v -> v != null && !v.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+        return cleaned;
     }
 
     private boolean isBlank(String s) {

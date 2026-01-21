@@ -14,13 +14,14 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     // pentru Explore global (toată lumea + search)
     @Query("""
-SELECT p FROM Project p
+SELECT DISTINCT p FROM Project p
 JOIN p.user u
+LEFT JOIN p.partners pr
 WHERE (:q IS NULL OR :q = '' OR
        LOWER(p.title) LIKE LOWER(CONCAT('%', :q, '%')) OR
        LOWER(COALESCE(p.acronym, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
        LOWER(COALESCE(p.abstractEn, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
-       LOWER(COALESCE(p.partners, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
+       LOWER(COALESCE(pr, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
        LOWER(COALESCE(p.coordinator, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
        LOWER(COALESCE(p.contractNumber, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR
        LOWER(COALESCE(p.url, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR

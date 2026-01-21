@@ -3,7 +3,8 @@ package com.platforma.backend.project;
 import com.platforma.backend.user.User;
 import jakarta.persistence.*;
 import lombok.*;
-
+import java.util.ArrayList;
+import java.util.List;
 import java.time.LocalDate;
 
 @Entity
@@ -36,8 +37,11 @@ public class Project {
     private String abstractEn;
 
     // Parteneri
-    @Column(length = 1200)
-    private String partners;
+    @ElementCollection
+    @CollectionTable(name = "project_partners", joinColumns = @JoinColumn(name = "project_id"))
+    @Column(name = "partner", length = 300)
+    @Builder.Default
+    private List<String> partners = new ArrayList<>();
 
     // Coordonator
     @Column(length = 300)

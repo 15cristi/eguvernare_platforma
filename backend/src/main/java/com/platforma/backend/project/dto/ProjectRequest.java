@@ -3,6 +3,7 @@ package com.platforma.backend.project.dto;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -14,7 +15,7 @@ public class ProjectRequest {
     private String title;                 // Titlu EN*
     private String acronym;               // Acronym*
     private String abstractEn;            // Abstract EN
-    private String partners;              // Parteneri
+    private List<String> partners;        // Parteneri (multiple)
     private String coordinator;           // Coordonator
     private String contractNumber;        // Numar contract*
 
