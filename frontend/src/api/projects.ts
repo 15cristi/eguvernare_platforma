@@ -12,7 +12,8 @@ export type ProjectDto = {
   title: string;
   acronym: string;
   abstractEn?: string;
-  partners?: string;
+  partners?: string[];
+
   coordinator?: string;
   contractNumber: string;
   startDate: string; // YYYY-MM-DD
@@ -24,17 +25,17 @@ export type ProjectDto = {
 
 export type ProjectRequest = {
   title: string;
-  acronym: string;
+  acronym?: string;
   abstractEn?: string;
-  partners?: string;
   coordinator?: string;
-  contractNumber: string;
-  startDate: string;
-  endDate: string;
-  possibleExtensionEndDate?: string | null;
-
+  contractNumber?: string;
   url?: string;
+  startDate?: string;
+  endDate?: string;
+  possibleExtensionEndDate?: string;
+  partners?: string[];
 };
+
 
 export const getMyProjects = async (): Promise<ProjectDto[]> => {
   const res = await api.get<ProjectDto[]>("/api/projects/me");
@@ -69,4 +70,16 @@ export const getAllProjects = async (q = "", page = 0, size = 12): Promise<PageR
 
 export const deleteProjectAdmin = async (id: number): Promise<void> => {
   await api.delete(`/api/projects/${id}`);
+};
+
+export const searchProjects = async (q = "", page = 0, size = 12): Promise<PageResponse<ProjectDto>> => {
+  const res = await api.get<PageResponse<ProjectDto>>("/api/projects", {
+    params: { q: q || undefined, page, size }
+  });
+  return res.data;
+};
+
+export const getProfileByUserId = async (userId: number) => {
+  const res = await api.get(`/api/profile/user/${userId}`);
+  return res.data;
 };
