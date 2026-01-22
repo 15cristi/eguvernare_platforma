@@ -16,7 +16,39 @@ import {
 } from "../api/publications";
 import type { PageResponse } from "../api/types";
 import { useNavigate } from "react-router-dom";
+
+import { getProfileByUserId } from "../api/profile";
 import { getOrCreateDirectConversation } from "../api/messages";
+
+type PublicProfile = {
+  headline?: string;
+  bio?: string;
+  country?: string;
+  city?: string;
+
+  affiliation?: string;
+  profession?: string;
+  university?: string;
+  faculty?: string;
+
+  expertAreas?: string[];
+  expertise?: { area: string; description: string }[];
+  resources?: { title: string; description: string; url: string }[];
+
+  companyName?: string;
+  companyDescription?: string;
+  companyDomains?: string[];
+
+  openToProjects?: boolean;
+  openToMentoring?: boolean;
+  availability?: string;
+  experienceLevel?: string;
+
+  linkedinUrl?: string;
+  githubUrl?: string;
+  website?: string;
+  avatarUrl?: string;
+};
 
 const norm = (s?: string | null) => (s || "").trim().replace(/\s+/g, " ");
 
@@ -34,7 +66,20 @@ const toUrl = (raw?: string | null) => {
   return v.startsWith("http") ? v : `https://${v}`;
 };
 
+const openExternal = (raw?: string | null) => {
+  const href = toUrl(raw);
+  if (!href) return;
+  window.open(href, "_blank", "noopener,noreferrer");
+};
+
 const joinName = (first?: string | null, last?: string | null) => `${first || ""} ${last || ""}`.trim();
+
+const initialsFromName = (name: string) => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const a = parts[0]?.[0] || "";
+  const b = parts.length > 1 ? parts[parts.length - 1]?.[0] || "" : "";
+  return (a + b).toUpperCase();
+};
 
 const typeOptions: { label: string; value: PublicationType }[] = [
   { label: "Journal Article", value: "ARTICOL_JURNAL" },
@@ -59,10 +104,19 @@ const prettyType = (t?: string | null) => {
   }
 };
 
-// Your backend returns pdfPath like "/files/publications/xyz.pdf"
+// Backend base
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "http://localhost:8080";
+
+// Backend returns pdfPath like "/files/publications/xyz.pdf"
 const toPdfUrl = (p: any) => {
   const v = norm(p?.pdfPath || p?.pdfUrl);
+  if (!v) return "";
+  if (v.startsWith("http")) return v;
+  return `${API_BASE}${v.startsWith("/") ? "" : "/"}${v}`;
+};
+
+const toAssetUrl = (raw?: string | null) => {
+  const v = norm(raw);
   if (!v) return "";
   if (v.startsWith("http")) return v;
   return `${API_BASE}${v.startsWith("/") ? "" : "/"}${v}`;
@@ -264,32 +318,326 @@ function ConfirmModal({
   );
 }
 
-export default function PublicationsPage() {
-   const nav = useNavigate();
+const compactLine = (label: string, value?: any) => {
+  const v = String(value ?? "").trim();
+  if (!v) return null;
+  return (
+    <div className="muted" style={{ lineHeight: 1.35 }}>
+      <span className="k">{label}</span> {v}
+    </div>
+  );
+};
 
-  const onMessageUser = async (otherUserId?: number | null) => {
-    if (!otherUserId) {
-      pushToast("error", "User id missing for this publication.");
-      return;
-    }
+function AvatarBubble({
+  name,
+  avatarUrl,
+  size = 34
+}: {
+  name: string;
+  avatarUrl?: string | null;
+  size?: number;
+}) {
+  const [ok, setOk] = useState(true);
 
-    if (auth.userId && otherUserId === auth.userId) {
-      pushToast("info", "You can’t send a message to yourself.");
-      return;
-    }
+  useEffect(() => {
+    setOk(true);
+  }, [avatarUrl, name, size]);
 
-    try {
-      const { conversationId } = await getOrCreateDirectConversation(otherUserId);
-      nav(`/messages?c=${conversationId}`);
-    } catch (e: any) {
-      const backendMsg = String(e?.response?.data?.message || "");
-      if (backendMsg.toLowerCase().includes("yourself")) {
-        pushToast("info", "You can’t send a message to yourself.");
-      } else {
-        pushToast("error", "You can’t send a message to yourself.");
-      }
-    }
+  const src = avatarUrl ? toAssetUrl(avatarUrl) : "";
+  const initials = initialsFromName(name || "?");
+
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 18,
+        overflow: "hidden",
+        flex: `0 0 ${size}px`,
+        display: "grid",
+        placeItems: "center",
+        background: "rgba(22, 163, 74, 0.20)",
+        border: "1px solid rgba(22, 163, 74, 0.18)"
+      }}
+      aria-label="Avatar"
+    >
+      {src && ok ? (
+        <img
+          src={src}
+          alt=""
+          width={size}
+          height={size}
+          style={{ width: size, height: size, objectFit: "cover", display: "block" }}
+          onError={() => setOk(false)}
+        />
+      ) : (
+        <span style={{ fontWeight: 800, fontSize: 12, opacity: 0.9 }}>{initials || "?"}</span>
+      )}
+    </div>
+  );
+}
+
+function ProfileModal({
+  user,
+  loading,
+  error,
+  profile,
+  onClose,
+  currentUserId,
+  onMessage
+}: {
+  user: { id: number; name: string; role: string } | null;
+  loading: boolean;
+  error: string;
+  profile: PublicProfile | null;
+  onClose: () => void;
+  currentUserId?: number | null;
+  onMessage: (otherUserId: number) => void;
+}) {
+  if (!user) return null;
+
+  const p = profile;
+  const title = user.name || "Profile";
+  const loc = [p?.city, p?.country].filter(Boolean).join(", ");
+
+  const expertise = p?.expertise?.length ? p.expertise : null;
+  const fallbackAreas =
+    !expertise && p?.expertAreas?.length ? p.expertAreas.map((a) => ({ area: a, description: "" })) : [];
+  const finalExpertise = expertise || fallbackAreas;
+
+  const prettyEnum = (v?: string) => {
+    const s = (v || "").trim();
+    if (!s) return "";
+    return s
+      .replaceAll("_", " ")
+      .toLowerCase()
+      .replace(/(^|\s)\S/g, (t) => t.toUpperCase());
   };
+
+  const showLink = (label: string, url?: string) => {
+    const v = (url || "").trim();
+    if (!v) return null;
+    const href = v.startsWith("http") ? v : `https://${v}`;
+    return (
+      <a className="annPill" href={href} target="_blank" rel="noreferrer">
+        {label}
+      </a>
+    );
+  };
+
+  const canMessage = !!user.id && (typeof currentUserId !== "number" ? true : user.id !== currentUserId);
+
+  return (
+    <div
+      className="annModalOverlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="annModal card" role="dialog" aria-modal="true">
+        <div className="annModalHead">
+          <div className="annModalTitle" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <AvatarBubble name={title} avatarUrl={p?.avatarUrl} size={44} />
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 18 }}>{title}</div>
+              {user.role ? <div className="muted">{user.role}</div> : null}
+              {loc ? <div className="muted">{loc}</div> : null}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {canMessage ? (
+              <button type="button" className="btn-primary" onClick={() => onMessage(user.id)}>
+                Message
+              </button>
+            ) : null}
+
+            <button className="btn-outline" type="button" onClick={onClose} aria-label="Close">
+              ×
+            </button>
+          </div>
+        </div>
+
+        <div className="annModalBody">
+          {loading ? <div className="muted">Loading…</div> : null}
+          {!loading && error ? <div className="muted">{error}</div> : null}
+
+          {!loading && !error ? (
+            <>
+              {p?.headline ? <div style={{ marginBottom: 10 }}>{p.headline}</div> : null}
+              {p?.bio ? <div style={{ whiteSpace: "pre-wrap", marginBottom: 10 }}>{p.bio}</div> : null}
+
+              <div className="projectDetails" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {p?.affiliation ? (
+                  <div>
+                    <span className="k">Affiliation:</span> {p.affiliation}
+                  </div>
+                ) : null}
+                {p?.profession ? (
+                  <div>
+                    <span className="k">Profession:</span> {p.profession}
+                  </div>
+                ) : null}
+                {p?.university ? (
+                  <div>
+                    <span className="k">University:</span> {p.university}
+                  </div>
+                ) : null}
+                {p?.faculty ? (
+                  <div>
+                    <span className="k">Faculty:</span> {p.faculty}
+                  </div>
+                ) : null}
+
+                {finalExpertise?.length ? (
+                  <div>
+                    <div className="k" style={{ marginBottom: 4 }}>
+                      Expertise
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {finalExpertise.map((x, idx) => (
+                        <li key={idx}>
+                          <strong>{x.area}</strong>
+                          {x.description ? <span className="muted">, {x.description}</span> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {(p?.availability || p?.experienceLevel) ? (
+                  <div>
+                    {p?.availability ? (
+                      <>
+                        <span className="k">Availability:</span> {prettyEnum(p.availability)}{" "}
+                      </>
+                    ) : null}
+                    {p?.experienceLevel ? (
+                      <>
+                        <span className="k">Level:</span> {prettyEnum(p.experienceLevel)}
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 6 }}>
+                  {showLink("LinkedIn", p?.linkedinUrl)}
+                  {showLink("GitHub", p?.githubUrl)}
+                  {showLink("Website", p?.website)}
+                </div>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PublicationDetailsModal({
+  publication,
+  onClose,
+  onOpenPdf,
+  onOpenProfile,
+  ownerAvatarUrl
+}: {
+  publication: PublicationDto | null;
+  onClose: () => void;
+  onOpenPdf: (p: PublicationDto) => void;
+  onOpenProfile: (userId: number | null, name: string, role: string) => void;
+  ownerAvatarUrl?: string | null;
+}) {
+  if (!publication) return null;
+
+  const ownerId =
+    (publication as any).userId ?? (publication as any).ownerId ?? (publication as any).createdById ?? null;
+
+  const name = joinName((publication as any).userFirstName, (publication as any).userLastName) || "User";
+  const role = ((publication as any).userRole || "").trim() || "";
+
+  const showLine = (label: string, value?: any) => {
+    const v = String(value ?? "").trim();
+    if (!v) return null;
+    return (
+      <div>
+        <span className="k">{label}</span> {v}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className="annConfirmOverlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="annConfirmModal card" role="dialog" aria-modal="true" style={{ maxWidth: 760 }}>
+        <div className="annConfirmHead">
+          <h3 className="annConfirmTitle">Publication details</h3>
+          <button className="btn-outline annConfirmClose" type="button" onClick={onClose}>
+            ×
+          </button>
+        </div>
+
+        <div className="projectDetails" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>{(publication as any).title}</div>
+              {(publication as any).type ? <div className="muted">{prettyType((publication as any).type)}</div> : null}
+
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 6 }}>
+                <AvatarBubble name={name} avatarUrl={ownerAvatarUrl} size={34} />
+                <div className="muted">
+                  {name}
+                  {role ? <span style={{ marginLeft: 8, opacity: 0.85 }}>({role})</span> : null}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => onOpenProfile(ownerId, name, role)}
+                disabled={!ownerId}
+                title="Open profile"
+              >
+                Profile
+              </button>
+
+              {(publication as any).pdfPath ? (
+                <button type="button" className="btn-outline" onClick={() => onOpenPdf(publication)}>
+                  PDF
+                </button>
+              ) : null}
+
+              {(publication as any).externalLink ? (
+                <button type="button" className="btn-outline" onClick={() => openExternal((publication as any).externalLink)}>
+                  Link
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {showLine("Authors:", (publication as any).authors)}
+          {showLine("Keywords:", (publication as any).keywords)}
+          {showLine("Journal / Conference:", (publication as any).journalTitle)}
+          {showLine("Publisher:", (publication as any).publisher)}
+          {showLine("Volume / Issue:", (publication as any).volumeIssue)}
+          {showLine("Pages:", (publication as any).pages)}
+          {showLine("DOI:", (publication as any).doi)}
+          {showLine("Year:", (publication as any).year)}
+          {showLine("Published:", (publication as any).publishedDate)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function PublicationsPage() {
+  const nav = useNavigate();
+
   const [tab, setTab] = useState<Tab>("MINE");
 
   const [items, setItems] = useState<PublicationDto[]>([]);
@@ -302,16 +650,14 @@ export default function PublicationsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editing, setEditing] = useState<Draft>(emptyDraft());
 
-  // Details panel like your screenshot (optional, only for MINE)
-  const [openMineId, setOpenMineId] = useState<number | null>(null);
+  const [detailsPub, setDetailsPub] = useState<PublicationDto | null>(null);
 
-  // Explore state like Projects
+  // Explore
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
   const [size] = useState(12);
   const [explore, setExplore] = useState<PageResponse<PublicationDto> | null>(null);
   const [exploreLoading, setExploreLoading] = useState(false);
-  const [openExploreId, setOpenExploreId] = useState<number | null>(null);
 
   const auth = useMemo(() => readAuthInfo(), []);
   const isAdmin = auth.role === "ADMIN";
@@ -320,8 +666,6 @@ export default function PublicationsPage() {
   const isBookOrChapterDraft = draft.type === "CARTE" || draft.type === "CAPITOL_CARTE";
   const isJournalOrConfEdit = editing.type === "ARTICOL_JURNAL" || editing.type === "LUCRARE_CONFERINTA";
   const isBookOrChapterEdit = editing.type === "CARTE" || editing.type === "CAPITOL_CARTE";
-
-  const selectedMine = useMemo(() => items.find((x) => x.id === openMineId) || null, [items, openMineId]);
 
   /* ===== toast state ===== */
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -340,6 +684,52 @@ export default function PublicationsPage() {
     id: number | null;
     label: string;
   }>({ open: false, mode: "MINE", id: null, label: "" });
+
+  // Profile modal state
+  const [profileUser, setProfileUser] = useState<{ id: number; name: string; role: string } | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileData, setProfileData] = useState<PublicProfile | null>(null);
+  const profileCache = useRef<Map<number, PublicProfile>>(new Map());
+
+  // Avatars cache for lists (like Projects)
+  const [avatars, setAvatars] = useState<Record<number, string | null | undefined>>({});
+
+  const getAvatarForUser = async (userId: number) => {
+    if (!userId) return;
+    if (avatars[userId] !== undefined) return; // already tried
+    setAvatars((m) => ({ ...m, [userId]: null })); // mark as tried (optimistic)
+
+    try {
+      const cached = profileCache.current.get(userId);
+      if (cached?.avatarUrl) {
+        setAvatars((m) => ({ ...m, [userId]: cached.avatarUrl || null }));
+        return;
+      }
+
+      const data = (await getProfileByUserId(userId)) as PublicProfile;
+      profileCache.current.set(userId, data);
+      setAvatars((m) => ({ ...m, [userId]: data.avatarUrl || null }));
+    } catch {
+      setAvatars((m) => ({ ...m, [userId]: null }));
+    }
+  };
+
+  const prefetchAvatars = async (pubs: PublicationDto[]) => {
+    const ids = Array.from(
+      new Set(
+        (pubs || [])
+          .map((p) => (p as any).userId ?? (p as any).ownerId ?? (p as any).createdById ?? null)
+          .filter((x: any) => typeof x === "number" && x > 0)
+      )
+    ) as number[];
+
+    // fire and forget, but still deterministic enough
+    for (const id of ids) {
+      // eslint-disable-next-line no-await-in-loop
+      await getAvatarForUser(id);
+    }
+  };
 
   useEffect(() => {
     if (!confirm.open) return;
@@ -385,8 +775,6 @@ export default function PublicationsPage() {
       doi: norm(d.doi) || undefined,
 
       year: yearNum === undefined ? undefined : yearNum,
-
-      // fallback if older backend still uses url
       url: norm(d.externalLink) || undefined
     } as any;
   };
@@ -396,15 +784,18 @@ export default function PublicationsPage() {
       try {
         const data = await getMyPublications();
         setItems(data || []);
+        prefetchAvatars(data || []);
       } finally {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshMine = async () => {
     const data = await getMyPublications();
     setItems(data || []);
+    prefetchAvatars(data || []);
   };
 
   const loadExplore = async (nextPage: number) => {
@@ -413,12 +804,12 @@ export default function PublicationsPage() {
       const res = await getAllPublications(q.trim(), nextPage, size);
       setExplore(res);
       setPage(nextPage);
-      setOpenExploreId(null);
+
+      if (res?.items?.length) prefetchAvatars(res.items);
     } catch (e) {
       console.error(e);
       setExplore({ items: [], page: 0, size, totalElements: 0, totalPages: 0 } as any);
       setPage(0);
-      setOpenExploreId(null);
       pushToast("error", "Could not load publications.");
     } finally {
       setExploreLoading(false);
@@ -448,7 +839,6 @@ export default function PublicationsPage() {
 
       setDraft(emptyDraft());
       setShowAdd(false);
-      setOpenMineId(created.id);
       await refreshMine();
       if (tab === "EXPLORE") await loadExplore(0);
 
@@ -503,7 +893,6 @@ export default function PublicationsPage() {
 
       cancelEdit();
       await refreshMine();
-      setOpenMineId(updated.id);
       if (tab === "EXPLORE") await loadExplore(page);
 
       pushToast("success", "Publication updated.");
@@ -514,8 +903,6 @@ export default function PublicationsPage() {
       setSaving(false);
     }
   };
-
-  /* ===== delete flow via confirm modal ===== */
 
   const requestDeleteMine = (p: PublicationDto) => {
     const label = norm((p as any).title || "").slice(0, 60) || "this publication";
@@ -541,12 +928,10 @@ export default function PublicationsPage() {
       if (mode === "MINE") {
         await deletePublication(id);
         if (editingId === id) cancelEdit();
-        if (openMineId === id) setOpenMineId(null);
         await refreshMine();
         if (tab === "EXPLORE") await loadExplore(page);
       } else {
         await deletePublicationAdmin(id);
-        if (openExploreId === id) setOpenExploreId(null);
         await loadExplore(page);
         await refreshMine();
       }
@@ -566,7 +951,6 @@ export default function PublicationsPage() {
 
     try {
       const relative = url.startsWith(API_BASE) ? url.slice(API_BASE.length) : url;
-
       const res = await api.get(relative, { responseType: "blob" });
       const blobUrl = URL.createObjectURL(res.data);
       window.open(blobUrl, "_blank", "noopener,noreferrer");
@@ -577,18 +961,58 @@ export default function PublicationsPage() {
     }
   };
 
-  const renderChips = (p: any) => (
-    <div className="itemMetaRow" style={{ marginTop: 10 }}>
-      {p.type ? <span className="chip">{prettyType(p.type)}</span> : null}
-      {p.journalTitle ? <span className="chip">{String(p.journalTitle)}</span> : null}
-      {p.publisher ? <span className="chip">{String(p.publisher)}</span> : null}
-      {p.volumeIssue ? <span className="chip">{String(p.volumeIssue)}</span> : null}
-      {p.pages ? <span className="chip">{String(p.pages)}</span> : null}
-      {p.doi ? <span className="chip">{`DOI: ${String(p.doi)}`}</span> : null}
-      {p.year ? <span className="chip">{String(p.year)}</span> : null}
-      {p.publishedDate ? <span className="chip">{String(p.publishedDate)}</span> : null}
-    </div>
-  );
+  const openProfile = async (userId: number | null, name: string, role: string) => {
+    if (!userId) return;
+
+    setProfileUser({ id: userId, name, role });
+    setProfileError("");
+    setProfileLoading(true);
+
+    const cached = profileCache.current.get(userId);
+    if (cached) {
+      setProfileData(cached);
+      setProfileLoading(false);
+      if (cached.avatarUrl) setAvatars((m) => ({ ...m, [userId]: cached.avatarUrl || null }));
+      return;
+    }
+
+    try {
+      const data = (await getProfileByUserId(userId)) as PublicProfile;
+      profileCache.current.set(userId, data);
+      setProfileData(data);
+      setAvatars((m) => ({ ...m, [userId]: data.avatarUrl || null }));
+    } catch (e) {
+      console.error(e);
+      setProfileData(null);
+      setProfileError("Could not load profile.");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const closeProfile = () => {
+    setProfileUser(null);
+    setProfileData(null);
+    setProfileLoading(false);
+    setProfileError("");
+  };
+
+  const onMessageFromProfile = async (otherUserId: number) => {
+    try {
+      const { conversationId } = await getOrCreateDirectConversation(otherUserId);
+      closeProfile();
+      nav(`/messages?c=${conversationId}`);
+    } catch (e) {
+      console.error(e);
+      pushToast("error", "Could not start conversation.");
+    }
+  };
+
+  const ownerIdForPub = (p: any) => (p?.userId ?? p?.ownerId ?? p?.createdById ?? null) as number | null;
+
+  const currentDetailsOwnerId = detailsPub ? ownerIdForPub(detailsPub as any) : null;
+  const currentDetailsOwnerAvatar =
+    currentDetailsOwnerId ? (avatars[currentDetailsOwnerId] ?? null) : null;
 
   return (
     <div className="annShell">
@@ -620,7 +1044,6 @@ export default function PublicationsPage() {
                 setTab("EXPLORE");
                 setShowAdd(false);
                 cancelEdit();
-                setOpenMineId(null);
               }}
               disabled={saving}
             >
@@ -825,42 +1248,34 @@ export default function PublicationsPage() {
                     <div className="annList" style={{ marginTop: 12 }}>
                       {items.map((p) => {
                         const isEditing = editingId === p.id;
-                        const isOpen = openMineId === p.id;
+
+                        const owner = joinName((p as any).userFirstName, (p as any).userLastName) || "Unknown user";
+                        const ownerId = ownerIdForPub(p as any);
+                        const avatarUrl = ownerId ? (avatars[ownerId] ?? null) : null;
 
                         return (
-                          <div
-                            key={p.id}
-                            className="projectItem"
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => setOpenMineId((cur) => (cur === p.id ? null : p.id))}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                setOpenMineId((cur) => (cur === p.id ? null : p.id));
-                              }
-                            }}
-                            style={{ cursor: "pointer" }}
-                          >
-                            <div className="projectTop">
-                              <div className="projectTitle">
-                                <strong>{(p as any).title}</strong>
-                                <span className="projectMeta">{prettyType((p as any).type)}</span>
+                          <div key={p.id} className="projectItem" style={{ cursor: "default" }}>
+                           <div className="projectTop">
+                              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                                <AvatarBubble name={owner} avatarUrl={avatarUrl} size={40} />
+
+                                <div className="projectTitle">
+                                  <strong>{(p as any).title}</strong>
+                                  <div className="muted" style={{ marginTop: 2 }}>{owner}</div>
+                                </div>
                               </div>
 
-                              <div className="projectActions" onClick={(e) => e.stopPropagation()}>
+                              <div className="projectActions">
                                 {!isEditing ? (
                                   <>
                                     <button type="button" className="btn-outline" onClick={() => startEdit(p)} disabled={saving}>
                                       Edit
                                     </button>
-                                    <button
-                                      type="button"
-                                      className="btn-outline"
-                                      onClick={() => requestDeleteMine(p)}
-                                      disabled={saving}
-                                    >
+                                    <button type="button" className="btn-outline" onClick={() => requestDeleteMine(p)} disabled={saving}>
                                       Delete
+                                    </button>
+                                    <button type="button" className="btn-outline" onClick={() => setDetailsPub(p)} disabled={saving}>
+                                      Details
                                     </button>
                                   </>
                                 ) : (
@@ -876,63 +1291,34 @@ export default function PublicationsPage() {
                               </div>
                             </div>
 
+
                             {!isEditing ? (
-                              <>
-                                <div className="projectDetails">{renderChips(p as any)}</div>
+                              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                                {compactLine("Type:", prettyType((p as any).type))}
+                                {compactLine("Authors:", (p as any).authors)}
+                                {compactLine("Keywords:", (p as any).keywords)}
+                                {compactLine("Journal / Conference:", (p as any).journalTitle)}
 
-                                {isOpen && (
-                                  <div className="projectDetails" style={{ marginTop: 10 }}>
-                                    {(p as any).authors ? (
-                                      <div>
-                                        <span className="k">Authors:</span> {(p as any).authors}
-                                      </div>
-                                    ) : null}
+                                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 6 }}>
+                                  {(p as any).pdfPath ? (
+                                    <button type="button" className="btn-outline" onClick={() => openPdfWithAuth(p as any)}>
+                                      PDF
+                                    </button>
+                                  ) : null}
 
-                                    {(p as any).keywords ? (
-                                      <div>
-                                        <span className="k">Keywords:</span> {(p as any).keywords}
-                                      </div>
-                                    ) : null}
-
-                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10 }}>
-                                      {(p as any).externalLink ? (
-                                        <a
-                                          className="annPill"
-                                          href={toUrl((p as any).externalLink)}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          External link
-                                        </a>
-                                      ) : null}
-
-                                      {(p as any).pdfPath ? (
-                                        <button
-                                          type="button"
-                                          className="btn-outline"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            openPdfWithAuth(p as any);
-                                          }}
-                                        >
-                                          Open PDF
-                                        </button>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                )}
-                              </>
+                                  {(p as any).externalLink ? (
+                                    <button type="button" className="btn-outline" onClick={() => openExternal((p as any).externalLink)}>
+                                      Link
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
                             ) : (
-                              <div className="projForm" style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
+                              <div className="projForm" style={{ marginTop: 12 }}>
                                 <div className="projGrid2">
                                   <label>
                                     Type*
-                                    <select
-                                      className="ecoInput"
-                                      value={editing.type}
-                                      onChange={(e) => setEditing((d) => ({ ...d, type: e.target.value as PublicationType }))}
-                                    >
+                                    <select className="ecoInput" value={editing.type} onChange={(e) => setEditing((d) => ({ ...d, type: e.target.value as PublicationType }))}>
                                       {typeOptions.map((opt) => (
                                         <option key={opt.value} value={opt.value}>
                                           {opt.label}
@@ -943,62 +1329,37 @@ export default function PublicationsPage() {
 
                                   <label>
                                     Title*
-                                    <input
-                                      className="ecoInput"
-                                      value={editing.title}
-                                      onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))}
-                                    />
+                                    <input className="ecoInput" value={editing.title} onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))} />
                                   </label>
                                 </div>
 
                                 <div className="projGrid2">
                                   <label>
                                     Authors
-                                    <input
-                                      className="ecoInput"
-                                      value={editing.authors}
-                                      onChange={(e) => setEditing((d) => ({ ...d, authors: e.target.value }))}
-                                    />
+                                    <input className="ecoInput" value={editing.authors} onChange={(e) => setEditing((d) => ({ ...d, authors: e.target.value }))} />
                                   </label>
 
                                   <label>
                                     External link
-                                    <input
-                                      className="ecoInput"
-                                      value={editing.externalLink}
-                                      onChange={(e) => setEditing((d) => ({ ...d, externalLink: e.target.value }))}
-                                    />
+                                    <input className="ecoInput" value={editing.externalLink} onChange={(e) => setEditing((d) => ({ ...d, externalLink: e.target.value }))} />
                                   </label>
                                 </div>
 
                                 <div className="projGrid2">
                                   <label>
                                     Publication date*
-                                    <input
-                                      className="ecoInput"
-                                      type="date"
-                                      value={editing.publishedDate}
-                                      onChange={(e) => setEditing((d) => ({ ...d, publishedDate: e.target.value }))}
-                                    />
+                                    <input className="ecoInput" type="date" value={editing.publishedDate} onChange={(e) => setEditing((d) => ({ ...d, publishedDate: e.target.value }))} />
                                   </label>
 
                                   <label>
                                     Year
-                                    <input
-                                      className="ecoInput"
-                                      value={editing.year}
-                                      onChange={(e) => setEditing((d) => ({ ...d, year: e.target.value }))}
-                                    />
+                                    <input className="ecoInput" value={editing.year} onChange={(e) => setEditing((d) => ({ ...d, year: e.target.value }))} />
                                   </label>
                                 </div>
 
                                 <label>
                                   Keywords
-                                  <input
-                                    className="ecoInput"
-                                    value={editing.keywords}
-                                    onChange={(e) => setEditing((d) => ({ ...d, keywords: e.target.value }))}
-                                  />
+                                  <input className="ecoInput" value={editing.keywords} onChange={(e) => setEditing((d) => ({ ...d, keywords: e.target.value }))} />
                                 </label>
 
                                 {isJournalOrConfEdit ? (
@@ -1006,40 +1367,24 @@ export default function PublicationsPage() {
                                     <div className="projGrid2">
                                       <label>
                                         Journal / Conference title*
-                                        <input
-                                          className="ecoInput"
-                                          value={editing.journalTitle}
-                                          onChange={(e) => setEditing((d) => ({ ...d, journalTitle: e.target.value }))}
-                                        />
+                                        <input className="ecoInput" value={editing.journalTitle} onChange={(e) => setEditing((d) => ({ ...d, journalTitle: e.target.value }))} />
                                       </label>
 
                                       <label>
                                         Volume / issue
-                                        <input
-                                          className="ecoInput"
-                                          value={editing.volumeIssue}
-                                          onChange={(e) => setEditing((d) => ({ ...d, volumeIssue: e.target.value }))}
-                                        />
+                                        <input className="ecoInput" value={editing.volumeIssue} onChange={(e) => setEditing((d) => ({ ...d, volumeIssue: e.target.value }))} />
                                       </label>
                                     </div>
 
                                     <div className="projGrid2">
                                       <label>
                                         Pages
-                                        <input
-                                          className="ecoInput"
-                                          value={editing.pages}
-                                          onChange={(e) => setEditing((d) => ({ ...d, pages: e.target.value }))}
-                                        />
+                                        <input className="ecoInput" value={editing.pages} onChange={(e) => setEditing((d) => ({ ...d, pages: e.target.value }))} />
                                       </label>
 
                                       <label>
                                         DOI
-                                        <input
-                                          className="ecoInput"
-                                          value={editing.doi}
-                                          onChange={(e) => setEditing((d) => ({ ...d, doi: e.target.value }))}
-                                        />
+                                        <input className="ecoInput" value={editing.doi} onChange={(e) => setEditing((d) => ({ ...d, doi: e.target.value }))} />
                                       </label>
                                     </div>
                                   </>
@@ -1048,21 +1393,13 @@ export default function PublicationsPage() {
                                 {isBookOrChapterEdit ? (
                                   <label>
                                     Publisher*
-                                    <input
-                                      className="ecoInput"
-                                      value={editing.publisher}
-                                      onChange={(e) => setEditing((d) => ({ ...d, publisher: e.target.value }))}
-                                    />
+                                    <input className="ecoInput" value={editing.publisher} onChange={(e) => setEditing((d) => ({ ...d, publisher: e.target.value }))} />
                                   </label>
                                 ) : null}
 
                                 <label>
                                   Replace PDF (max 10 MB)
-                                  <input
-                                    type="file"
-                                    accept="application/pdf"
-                                    onChange={(e) => setEditing((d) => ({ ...d, pdfFile: e.target.files?.[0] || null }))}
-                                  />
+                                  <input type="file" accept="application/pdf" onChange={(e) => setEditing((d) => ({ ...d, pdfFile: e.target.files?.[0] || null }))} />
                                   {(p as any).pdfPath ? (
                                     <div style={{ marginTop: 8 }}>
                                       <button type="button" className="btn-outline" onClick={() => openPdfWithAuth(p as any)}>
@@ -1079,54 +1416,6 @@ export default function PublicationsPage() {
                     </div>
                   )}
                 </div>
-
-                {selectedMine && openMineId != null && editingId == null ? (
-                  <div className="card" style={{ padding: 16, marginTop: 16 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                      <strong>Publication details</strong>
-                      <button type="button" className="btn-outline" onClick={() => setOpenMineId(null)}>
-                        Close
-                      </button>
-                    </div>
-
-                    <div style={{ marginTop: 12 }}>
-                      <div className="muted" style={{ marginBottom: 6 }}>
-                        Title
-                      </div>
-                      <div>
-                        <strong>{(selectedMine as any).title || "-"}</strong>
-                      </div>
-
-                      {renderChips(selectedMine as any)}
-
-                      {(selectedMine as any).authors ? (
-                        <div style={{ marginTop: 10 }}>
-                          <span className="k">Authors:</span> {(selectedMine as any).authors}
-                        </div>
-                      ) : null}
-
-                      {(selectedMine as any).keywords ? (
-                        <div style={{ marginTop: 6 }}>
-                          <span className="k">Keywords:</span> {(selectedMine as any).keywords}
-                        </div>
-                      ) : null}
-
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
-                        {(selectedMine as any).externalLink ? (
-                          <a className="annPill" href={toUrl((selectedMine as any).externalLink)} target="_blank" rel="noreferrer">
-                            External link
-                          </a>
-                        ) : null}
-
-                        {(selectedMine as any).pdfPath ? (
-                          <button type="button" className="btn-outline" onClick={() => openPdfWithAuth(selectedMine as any)}>
-                            Open PDF
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
               </>
             )}
           </>
@@ -1178,115 +1467,65 @@ export default function PublicationsPage() {
                 <>
                   <div className="annList">
                     {explore.items.map((p) => {
-                      const isOpen = openExploreId === p.id;
                       const owner = joinName((p as any).userFirstName, (p as any).userLastName) || "Unknown user";
-
-                       const ownerId =
-                        (p as any).userId ||
-                        (p as any).ownerId ||
-                        (p as any).createdById;
-
-                      const canMessage = !!ownerId && ownerId !== auth.userId;
-
+                      const ownerId = ownerIdForPub(p as any);
+                      const avatarUrl = ownerId ? (avatars[ownerId] ?? null) : null;
 
                       return (
-                        <div
-                          key={p.id}
-                          className="projectItem"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setOpenExploreId((cur) => (cur === p.id ? null : p.id))}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              setOpenExploreId((cur) => (cur === p.id ? null : p.id));
-                            }
-                          }}
-                          style={{ cursor: "pointer" }}
-                        >
+                        <div key={p.id} className="projectItem" style={{ cursor: "default" }}>
                           <div className="projectTop">
-                            <div className="projectTitle">
-                              <strong>{(p as any).title}</strong>
-                              <span className="projectMeta">{prettyType((p as any).type)}</span>
-                            </div>
+                                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                                  <AvatarBubble name={owner} avatarUrl={avatarUrl} size={40} />
 
-                            <div className="muted" style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                              <span>
-                                {owner}
-                                <span style={{ marginLeft: 10, opacity: 0.8 }}>{isOpen ? "▲" : "▼"}</span>
-                              </span>
-                              {canMessage && (
-                              <button
-                                type="button"
-                                className="btn-outline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onMessageUser(ownerId);
-                                }}
-                                disabled={saving}
-                                title="Message author"
-                              >
-                                Message
-                              </button>
-                            )}
+                                  <div className="projectTitle">
+                                    <strong>{(p as any).title}</strong>
+                                    <div className="muted" style={{ marginTop: 2 }}>{owner}</div>
+                                  </div>
+                                </div>
 
-                              {isAdmin ? (
-                                <button
-                                  type="button"
-                                  className="btn-outline"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    requestDeleteExploreAdmin(p);
-                                  }}
-                                  disabled={saving}
-                                  title="Admin delete"
-                                >
-                                  Delete
+                                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                                  <button
+                                    type="button"
+                                    className="btn-outline"
+                                    onClick={() => setDetailsPub(p)}
+                                    disabled={saving}
+                                  >
+                                    Details
+                                  </button>
+
+                                  {isAdmin ? (
+                                    <button
+                                      type="button"
+                                      className="btn-outline"
+                                      onClick={() => requestDeleteExploreAdmin(p)}
+                                      disabled={saving}
+                                    >
+                                      Delete
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                            {compactLine("Type:", prettyType((p as any).type))}
+                            {compactLine("Authors:", (p as any).authors)}
+                            {compactLine("Keywords:", (p as any).keywords)}
+                            {compactLine("Journal / Conference:", (p as any).journalTitle)}
+
+                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 6 }}>
+                              {(p as any).pdfPath ? (
+                                <button type="button" className="btn-outline" onClick={() => openPdfWithAuth(p as any)}>
+                                  PDF
+                                </button>
+                              ) : null}
+
+                              {(p as any).externalLink ? (
+                                <button type="button" className="btn-outline" onClick={() => openExternal((p as any).externalLink)}>
+                                  Link
                                 </button>
                               ) : null}
                             </div>
                           </div>
-
-                          <div className="projectDetails">{renderChips(p as any)}</div>
-
-                          {isOpen && (
-                            <div className="projectDetails" style={{ marginTop: 10 }}>
-                              {(p as any).authors ? (
-                                <div>
-                                  <span className="k">Authors:</span> {(p as any).authors}
-                                </div>
-                              ) : null}
-
-                              {(p as any).externalLink ? (
-                                <div style={{ marginTop: 8 }}>
-                                  <a
-                                    className="annInlineLink"
-                                    href={toUrl((p as any).externalLink)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    Open link
-                                  </a>
-                                </div>
-                              ) : null}
-
-                              {(p as any).pdfPath ? (
-                                <div style={{ marginTop: 8 }}>
-                                  <button
-                                    type="button"
-                                    className="btn-outline"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openPdfWithAuth(p as any);
-                                    }}
-                                  >
-                                    Open PDF
-                                  </button>
-                                </div>
-                              ) : null}
-                            </div>
-                          )}
                         </div>
                       );
                     })}
@@ -1319,6 +1558,29 @@ export default function PublicationsPage() {
           </div>
         )}
       </div>
+
+      <PublicationDetailsModal
+        publication={detailsPub}
+        ownerAvatarUrl={currentDetailsOwnerAvatar}
+        onClose={() => setDetailsPub(null)}
+        onOpenPdf={openPdfWithAuth}
+        onOpenProfile={(uid, name, role) => {
+          setDetailsPub(null);
+          if (uid) openProfile(uid, name, role);
+        }}
+      />
+
+      {profileUser ? (
+        <ProfileModal
+          user={profileUser}
+          loading={profileLoading}
+          error={profileError}
+          profile={profileData}
+          onClose={closeProfile}
+          currentUserId={auth.userId}
+          onMessage={onMessageFromProfile}
+        />
+      ) : null}
 
       <ConfirmModal
         open={confirm.open}
