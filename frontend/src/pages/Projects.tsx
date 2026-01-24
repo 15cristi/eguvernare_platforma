@@ -1,4 +1,3 @@
-// src/pages/Projects.tsx
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -13,6 +12,7 @@ import { getProfileByUserId } from "../api/profile";
 import { getOrCreateDirectConversation } from "../api/messages";
 import { AuthContext } from "../context/AuthContext";
 import "./Projects.css";
+import { openCv } from "../api/profile";
 
 type Draft = {
   title: string;
@@ -41,6 +41,7 @@ type PublicProfile = {
   expertAreas?: string[];
   expertise?: { area: string; description: string }[];
   resources?: { title: string; description: string; url: string }[];
+  cvUrl?: string;
 
   companyName?: string;
   companyDescription?: string;
@@ -59,6 +60,11 @@ type PublicProfile = {
 
 const norm = (s: string) => (s ?? "").trim();
 const normList = (items: string[]) => (items ?? []).map((x) => norm(x)).filter((x) => x.length > 0);
+const toUrl = (raw: string) => {
+  const v = (raw || "").trim();
+  if (!v) return "";
+  return v.startsWith("http://") || v.startsWith("https://") ? v : `https://${v}`;
+};
 
 function pickPage<T>(page: any): { items: T[]; pageIndex: number; hasMore: boolean } {
   if (!page) return { items: [], pageIndex: 0, hasMore: false };
@@ -95,6 +101,45 @@ function pickPage<T>(page: any): { items: T[]; pageIndex: number; hasMore: boole
   return { items, pageIndex, hasMore };
 }
 
+function AvatarBubble({
+  name,
+  avatarUrl,
+  size = 44
+}: {
+  name: string;
+  avatarUrl?: string | null;
+  size?: number;
+}) {
+  const initials = (name || "U")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase())
+    .join("");
+
+  return (
+    <div
+      className="annModalAvatar"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 14,
+        flex: "0 0 auto",
+        background: avatarUrl ? `url(${avatarUrl}) center/cover no-repeat` : "rgba(255,255,255,0.08)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        display: "grid",
+        placeItems: "center",
+        fontWeight: 800,
+        color: "rgba(232,247,241,0.9)"
+      }}
+      aria-label={name}
+      title={name}
+    >
+      {!avatarUrl ? initials : null}
+    </div>
+  );
+}
+
 function ProfileModal({
   user,
   loading,
@@ -109,42 +154,10 @@ function ProfileModal({
   error: string;
   profile: PublicProfile | null;
   onClose: () => void;
-  currentUserId?: number;
+  currentUserId: number | null;
   onMessage: (otherUserId: number) => void;
 }) {
   if (!user) return null;
-
-  const p = profile;
-  const title = user.name || "Profile";
-  const loc = [p?.city, p?.country].filter(Boolean).join(", ");
-
-  const expertise = p?.expertise?.length ? p.expertise : null;
-  const fallbackAreas =
-    !expertise && p?.expertAreas?.length ? p.expertAreas.map((a) => ({ area: a, description: "" })) : [];
-  const finalExpertise = expertise || fallbackAreas;
-
-  const prettyEnum = (v?: string) => {
-    const s = (v || "").trim();
-    if (!s) return "";
-    return s
-      .replaceAll("_", " ")
-      .toLowerCase()
-      .replace(/(^|\s)\S/g, (t) => t.toUpperCase());
-  };
-
-  const showLink = (label: string, url?: string) => {
-    const v = (url || "").trim();
-    if (!v) return null;
-    const href = v.startsWith("http") ? v : `https://${v}`;
-    return (
-      <a className="annPill" href={href} target="_blank" rel="noreferrer">
-        {label}
-      </a>
-    );
-  };
-
-  const canMessage =
-    !!user.id && (typeof currentUserId !== "number" ? true : user.id !== currentUserId);
 
   return (
     <div
@@ -155,166 +168,167 @@ function ProfileModal({
     >
       <div className="annModal card" role="dialog" aria-modal="true">
         <div className="annModalHead">
-          <div className="annModalTitle">
-            <div
-                className="annModalAvatar"
-                style={
-                  p?.avatarUrl
-                    ? {
-                        backgroundImage: `url(${p.avatarUrl})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        backgroundRepeat: "no-repeat"
-                      }
-                    : undefined
-                }
-              />
-
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <AvatarBubble name={user.name} avatarUrl={profile?.avatarUrl ?? null} />
             <div>
-              <h3>{title}</h3>
-              <div className="muted">{user.role}</div>
+              <div className="annModalTitle">{user.name}</div>
+              <div className="annModalSub">
+                {user.role}
+                {profile?.faculty ? ` · ${profile.faculty}` : ""}
+              </div>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 10 }}>
-            {canMessage ? (
-              <button className="btn-primary" type="button" onClick={() => onMessage(user.id)}>
-                Message
-              </button>
-            ) : null}
-
-            <button className="btn-outline" type="button" onClick={onClose}>
-              Close
-            </button>
-          </div>
+          <button className="annIconBtn" type="button" onClick={onClose} aria-label="Close">
+            ×
+          </button>
         </div>
 
-        {loading && <div className="muted">Loading…</div>}
-        {error && <div className="annError">{error}</div>}
+        <div className="annModalBody">
+          {loading ? <div className="hint">Loading…</div> : null}
+          {!loading && error ? <div className="error">{error}</div> : null}
 
-        {!loading && !error && p && (
-          <div className="annModalBody">
-            {p.headline?.trim() ? <div className="annHeadline">{p.headline}</div> : null}
-            {loc ? <div className="muted">{loc}</div> : null}
-            {p.bio?.trim() ? <div className="annBio">{p.bio}</div> : null}
-
-            <div className="annGrid">
-              {p.affiliation?.trim() ? (
-                <div>
-                  <div className="muted">Affiliation</div>
-                  <div>{p.affiliation}</div>
-                </div>
-              ) : null}
-
-              {p.profession?.trim() ? (
-                <div>
-                  <div className="muted">Profession</div>
-                  <div>{p.profession}</div>
-                </div>
-              ) : null}
-
-              {p.faculty?.trim() ? (
-                <div>
-                  <div className="muted">Faculty</div>
-                  <div>{p.faculty}</div>
-                </div>
-              ) : null}
-
-              {p.university?.trim() ? (
-                <div>
-                  <div className="muted">University</div>
-                  <div>{p.university}</div>
-                </div>
-              ) : null}
-            </div>
-
-            {(p.openToProjects || p.openToMentoring || p.availability?.trim() || p.experienceLevel?.trim()) && (
-              <div className="annSection">
-                <div className="annSectionTitle">Collaborations</div>
-                <div className="annPills">
-                  {p.openToProjects ? <span className="annPill">Open to projects</span> : null}
-                  {p.openToMentoring ? <span className="annPill">Open to mentoring</span> : null}
-                  {p.availability?.trim() ? <span className="annPill">{prettyEnum(p.availability)}</span> : null}
-                  {p.experienceLevel?.trim() ? <span className="annPill">{prettyEnum(p.experienceLevel)}</span> : null}
-                </div>
-              </div>
-            )}
-
-            {finalExpertise?.length ? (
-              <div className="annSection">
-                <div className="annSectionTitle">Expertise</div>
-                <div className="annList">
-                  {finalExpertise.map((x, idx) => (
-                    <div className="annListItem" key={`${x.area}-${idx}`}>
-                      <div className="annListTop">
-                        <strong>{x.area}</strong>
-                      </div>
-                      {x.description?.trim() ? <div className="muted">{x.description}</div> : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {p.resources?.length ? (
-              <div className="annSection">
-                <div className="annSectionTitle">Resources</div>
-                <div className="annList">
-                  {p.resources.map((r, idx) => (
-                    <div className="annListItem" key={`${r.title}-${idx}`}>
-                      <div className="annListTop">
-                        <strong>{r.title}</strong>
-                        {r.url?.trim() ? (
-                          <a
-                            className="annInlineLink"
-                            href={r.url.startsWith("http") ? r.url : `https://${r.url}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Open
-                          </a>
-                        ) : null}
-                      </div>
-                      {r.description?.trim() ? <div className="muted">{r.description}</div> : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {(p.companyName?.trim() || p.companyDescription?.trim() || p.companyDomains?.length) && (
-              <div className="annSection">
-                <div className="annSectionTitle">Company</div>
-                {p.companyName?.trim() ? (
-                  <div>
-                    <strong>{p.companyName}</strong>
+          {!loading && !error && profile ? (
+            <>
+              <div className="annModalSection">
+                <div className="annRow2">
+                  <div className="annInfoBox">
+                    <div className="annInfoLabel">Profession</div>
+                    <div className="annInfoValue">{profile.profession || "-"}</div>
                   </div>
-                ) : null}
-                {p.companyDescription?.trim() ? <div className="muted" style={{ marginTop: 6 }}>{p.companyDescription}</div> : null}
-                {p.companyDomains?.length ? (
-                  <div className="annPills">
-                    {p.companyDomains.slice(0, 12).map((d) => (
-                      <span className="annPill" key={d}>
-                        {d}
-                      </span>
-                    ))}
+                  <div className="annInfoBox">
+                    <div className="annInfoLabel">Faculty</div>
+                    <div className="annInfoValue">{profile.faculty || "-"}</div>
+                  </div>
+                </div>
+
+                <div className="annInfoBox" style={{ marginTop: 12 }}>
+                  <div className="annInfoLabel">University</div>
+                  <div className="annInfoValue">{profile.university || profile.affiliation || "-"}</div>
+                </div>
+
+                {profile.bio ? (
+                  <div className="annInfoBox" style={{ marginTop: 12 }}>
+                    <div className="annInfoLabel">Bio</div>
+                    <div className="annInfoValue">{profile.bio}</div>
                   </div>
                 ) : null}
               </div>
-            )}
 
-            {(p.linkedinUrl?.trim() || p.githubUrl?.trim() || p.website?.trim()) && (
-              <div className="annSection">
-                <div className="annSectionTitle">Links</div>
-                <div className="annPills">
-                  {showLink("LinkedIn", p.linkedinUrl)}
-                  {showLink("GitHub", p.githubUrl)}
-                  {showLink("Website", p.website)}
+              <div className="annModalSection">
+                <div className="annInfoBox">
+                  <div className="annInfoLabel">Collaborations</div>
+                  <div className="annInfoValue">
+                    <div className="annChips">
+                      {profile.openToProjects ? <span className="annChip">Open to projects</span> : null}
+                      {profile.openToMentoring ? <span className="annChip">Open to mentoring</span> : null}
+                      {profile.availability ? <span className="annChip">{profile.availability}</span> : null}
+                      {profile.experienceLevel ? <span className="annChip">{profile.experienceLevel}</span> : null}
+                    </div>
+                  </div>
                 </div>
+
+                {profile.expertise?.length ? (
+                  <div className="annInfoBox" style={{ marginTop: 12 }}>
+                    <div className="annInfoLabel">Expertise</div>
+                    <div className="annInfoValue">
+                      <div className="annList">
+                        {profile.expertise.map((x, idx) => (
+                          <div key={`${x.area}-${idx}`} className="annListRow">
+                            <div className="annListTitle">{x.area}</div>
+                            <div className="annListSub">{x.description}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : profile.expertAreas?.length ? (
+                  <div className="annInfoBox" style={{ marginTop: 12 }}>
+                    <div className="annInfoLabel">Expertise</div>
+                    <div className="annInfoValue">{profile.expertAreas.join(", ")}</div>
+                  </div>
+                ) : null}
+
+                {profile.resources?.length ? (
+                  <div className="annInfoBox" style={{ marginTop: 12 }}>
+                    <div className="annInfoLabel">Resources</div>
+                    <div className="annInfoValue">
+                      <div className="annList">
+                        {profile.resources.map((r, idx) => (
+                          <div key={`${r.title}-${idx}`} className="annResourceRow">
+                            <div style={{ minWidth: 0 }}>
+                              <div className="annListTitle">{r.title}</div>
+                              {r.description ? <div className="annListSub">{r.description}</div> : null}
+                            </div>
+                            <button type="button" className="annLinkBtn" onClick={() => openCv(r.url)}>
+                              Open
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {profile.companyName ? (
+                  <div className="annInfoBox" style={{ marginTop: 12 }}>
+                    <div className="annInfoLabel">Company</div>
+                    <div className="annInfoValue">
+                      <div className="annListTitle">{profile.companyName}</div>
+                      {profile.companyDescription ? <div className="annListSub">{profile.companyDescription}</div> : null}
+                      {profile.companyDomains?.length ? (
+                        <div className="annChips" style={{ marginTop: 8 }}>
+                          {profile.companyDomains.map((d, i) => (
+                            <span key={`${d}-${i}`} className="annChip">
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
               </div>
-            )}
-          </div>
-        )}
+
+
+              {profile.cvUrl ? (
+                <div className="annInfoBox" style={{ marginTop: 12 }}>
+                  <div className="annInfoLabel">CV</div>
+                  <div className="annInfoValue">
+                    <button
+                      type="button"
+                      className="annLinkBtn"
+                      onClick={() => openCv(profile.cvUrl!)}
+                    >
+                      Open CV
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+
+
+            </>
+          ) : null}
+          
+
+
+          
+        </div>
+          
+
+
+        <div className="annModalFoot">
+          <button className="btn-outline" type="button" onClick={onClose}>
+            Close
+          </button>
+
+          {currentUserId && user.id !== currentUserId ? (
+            <button className="btn" type="button" onClick={() => onMessage(user.id)} disabled={loading}>
+              Message
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -322,127 +336,109 @@ function ProfileModal({
 
 function ProjectDetailsModal({
   project,
+  ownerAvatarUrl,
   onClose,
-  onOpenProfile,
-  ownerAvatarUrl
+  onOpenProfile
 }: {
   project: ProjectDto | null;
+  ownerAvatarUrl?: string | null;
   onClose: () => void;
-  onOpenProfile: (userId: number | null, name: string, role: string) => void;
-  ownerAvatarUrl: string | null;
+  onOpenProfile: (uid: number | null, name: string, role: string) => void;
 }) {
   if (!project) return null;
 
-  const ownerId = (project as any).userId ?? null;
-
-  const partners = Array.isArray(project.partners)
-    ? project.partners.filter((x) => !!x && String(x).trim().length > 0)
-    : [];
-
-  const contractNumber = (project as any).contractNumber ?? "";
-
-  const name = `${(project.userFirstName || "").trim()} ${(project.userLastName || "").trim()}`.trim() || "User";
-  const role = (project.userRole || "").trim() || "";
+  const uid = (project as any)?.userId ?? null;
+  const name = `${(project as any)?.userFirstName ?? ""} ${(project as any)?.userLastName ?? ""}`.trim() || "User";
+  const role = (project as any)?.userRole ?? "User";
 
   return (
     <div
-      className="annConfirmOverlay"
+      className="annModalOverlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="annConfirmModal card" role="dialog" aria-modal="true" style={{ maxWidth: 760 }}>
-        <div className="annConfirmHead">
-          <h3 className="annConfirmTitle">Project details</h3>
-          <button className="btn-outline annConfirmClose" type="button" onClick={onClose}>
+      <div className="annModal card" role="dialog" aria-modal="true">
+        <div className="annModalHead">
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <AvatarBubble name={name} avatarUrl={ownerAvatarUrl ?? null} />
+            <div>
+              <div className="annModalTitle">{project.title}</div>
+              <div className="annModalSub">
+                {project.acronym ? `${project.acronym} · ` : ""}
+                {name}
+              </div>
+            </div>
+          </div>
+
+          <button className="annIconBtn" type="button" onClick={onClose} aria-label="Close">
             ×
           </button>
         </div>
 
-        <div className="projectDetails" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <div
-                className="avatarSmall"
-                style={
-                  ownerAvatarUrl
-                    ? {
-                        backgroundImage: `url(${ownerAvatarUrl})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        backgroundRepeat: "no-repeat"
-                      }
-                    : undefined
-                }
-              />
-
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{project.title}</div>
-                {project.acronym ? <div className="muted">{project.acronym}</div> : null}
-                <div className="muted" style={{ marginTop: 4 }}>
-                  {name}
-                  {role ? <span style={{ marginLeft: 8, opacity: 0.85 }}>({role})</span> : null}
-                </div>
-              </div>
+        <div className="annModalBody">
+          {project.abstractEn ? (
+            <div className="annInfoBox">
+              <div className="annInfoLabel">Abstract</div>
+              <div className="annInfoValue">{project.abstractEn}</div>
             </div>
+          ) : null}
 
-            <button
-              type="button"
-              className="btn-outline"
-              onClick={() => onOpenProfile(ownerId, name, role)}
-              disabled={!ownerId}
-              title="Open profile"
-            >
-              Profile
-            </button>
+          <div className="annRow2" style={{ marginTop: 12 }}>
+            <div className="annInfoBox">
+              <div className="annInfoLabel">Coordinator</div>
+              <div className="annInfoValue">{project.coordinator || "-"}</div>
+            </div>
+            <div className="annInfoBox">
+              <div className="annInfoLabel">Contract number</div>
+              <div className="annInfoValue">{project.contractNumber || "-"}</div>
+            </div>
           </div>
 
-          {project.startDate && project.endDate ? (
-            <div>
-              <span className="k">Timeline:</span> {project.startDate} → {project.endDate}
-              {project.possibleExtensionEndDate ? (
-                <>
-                  {" "}
-                  <span className="k">Ext:</span> {project.possibleExtensionEndDate}
-                </>
-              ) : null}
+          <div className="annRow2" style={{ marginTop: 12 }}>
+            <div className="annInfoBox">
+              <div className="annInfoLabel">Start</div>
+              <div className="annInfoValue">{project.startDate || "-"}</div>
             </div>
-          ) : null}
-
-          {contractNumber ? (
-            <div>
-              <span className="k">Contract:</span> {contractNumber}
+            <div className="annInfoBox">
+              <div className="annInfoLabel">End</div>
+              <div className="annInfoValue">{project.endDate || "-"}</div>
             </div>
-          ) : null}
+          </div>
 
-          {project.coordinator ? (
-            <div>
-              <span className="k">Coordinator:</span> {project.coordinator}
-            </div>
-          ) : null}
-
-          {partners.length ? (
-            <div>
-              <span className="k">Partners:</span> {partners.join(", ")}
-            </div>
-          ) : null}
-
-          {project.abstractEn ? (
-            <div>
-              <div className="k" style={{ marginBottom: 4 }}>
-                Abstract
-              </div>
-              <div style={{ whiteSpace: "pre-wrap" }}>{project.abstractEn}</div>
+          {project.possibleExtensionEndDate ? (
+            <div className="annInfoBox" style={{ marginTop: 12 }}>
+              <div className="annInfoLabel">Possible extension end</div>
+              <div className="annInfoValue">{project.possibleExtensionEndDate}</div>
             </div>
           ) : null}
 
           {project.url ? (
-            <div>
-              <a className="annInlineLink" href={project.url} target="_blank" rel="noreferrer">
-                Open link
-              </a>
+            <div className="annInfoBox" style={{ marginTop: 12 }}>
+              <div className="annInfoLabel">URL</div>
+              <div className="annInfoValue">
+                <a className="annLink" href={toUrl(project.url)} target="_blank" rel="noreferrer">
+                  {project.url}
+                </a>
+              </div>
             </div>
           ) : null}
+
+          {project.partners?.length ? (
+            <div className="annInfoBox" style={{ marginTop: 12 }}>
+              <div className="annInfoLabel">Partners</div>
+              <div className="annInfoValue">{project.partners.join(", ")}</div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="annModalFoot">
+          <button className="btn-outline" type="button" onClick={onClose}>
+            Close
+          </button>
+          <button className="btn" type="button" onClick={() => onOpenProfile(uid, name, role)}>
+            View profile
+          </button>
         </div>
       </div>
     </div>
@@ -453,34 +449,7 @@ export default function ProjectsPage() {
   const nav = useNavigate();
   const { user } = useContext(AuthContext);
 
-  const currentUserId: number | undefined =
-    (user as any)?.id ?? (user as any)?.userId ?? (user as any)?.sub ?? undefined;
-
-  const [tab, setTab] = useState<"my" | "explore">("my");
-  const [saving, setSaving] = useState(false);
-
-  // My projects
-  const [myProjects, setMyProjects] = useState<ProjectDto[]>([]);
-  const [loadingMy, setLoadingMy] = useState(false);
-
-  // Explore (paged)
-  const [q, setQ] = useState("");
-  const [explore, setExplore] = useState<ProjectDto[]>([]);
-  const [loadingExplore, setLoadingExplore] = useState(false);
-  const [explorePage, setExplorePage] = useState(0);
-  const [exploreHasMore, setExploreHasMore] = useState(false);
-
-  // Details modal (Explore)
-  const [detailsProject, setDetailsProject] = useState<ProjectDto | null>(null);
-
-  // Profile modal (like announcements)
-  const [profileUser, setProfileUser] = useState<{ id: number; name: string; role: string } | null>(null);
-  const [profileData, setProfileData] = useState<PublicProfile | null>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profileError, setProfileError] = useState("");
-
-  const profileCache = useRef(new Map<number, PublicProfile>());
-  const [avatars, setAvatars] = useState<Record<number, string | null | undefined>>({});
+  const currentUserId: number | null = user?.id ?? null;
 
   const emptyDraft: Draft = useMemo(
     () => ({
@@ -498,86 +467,52 @@ export default function ProjectsPage() {
     []
   );
 
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [tab, setTab] = useState<"my" | "explore">("my");
 
-  // Editing (My projects)
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [saving, setSaving] = useState(false);
+
+  const [myProjects, setMyProjects] = useState<ProjectDto[]>([]);
+  const [loadingMy, setLoadingMy] = useState(false);
+
+  const [explore, setExplore] = useState<ProjectDto[]>([]);
+  const [loadingExplore, setLoadingExplore] = useState(false);
+  const [explorePage, setExplorePage] = useState(0);
+  const [exploreHasMore, setExploreHasMore] = useState(false);
+  const [q, setQ] = useState("");
+
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editing, setEditing] = useState<Draft>(emptyDraft);
 
-  const getAvatarForUser = async (userId: number | null | undefined) => {
-    if (!userId) return null;
+  const [detailsProject, setDetailsProject] = useState<ProjectDto | null>(null);
 
-    const cached = profileCache.current.get(userId);
-    if (cached?.avatarUrl) return cached.avatarUrl;
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id: number; title: string }>({
+    open: false,
+    id: 0,
+    title: ""
+  });
 
-    try {
-      const data = (await getProfileByUserId(userId)) as PublicProfile;
-      profileCache.current.set(userId, data);
-      return data.avatarUrl || null;
-    } catch {
-      return null;
-    }
-  };
+  const [profileUser, setProfileUser] = useState<{ id: number; name: string; role: string } | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileData, setProfileData] = useState<PublicProfile | null>(null);
 
-  const ensureAvatar = async (userId: number | null | undefined) => {
+  const avatarsRef = useRef<Record<number, string | null>>({});
+  const [avatars, setAvatars] = useState<Record<number, string | null>>({});
+
+  const fetchAvatar = async (userId: number) => {
     if (!userId) return;
-    if (avatars[userId] !== undefined) return; // deja încercat / există
-    setAvatars((m) => ({ ...m, [userId]: null })); // rezervă slotul
+    if (userId in avatarsRef.current) return;
 
-    const url = await getAvatarForUser(userId);
-    setAvatars((m) => ({ ...m, [userId]: url }));
-  };
-
-  const openProfile = async (userId: number, name: string, role: string) => {
-    setProfileUser({ id: userId, name, role });
-
-    const cached = profileCache.current.get(userId) || null;
-    setProfileData(cached);
-
-    setProfileError("");
-    setProfileLoading(true);
-
+    avatarsRef.current[userId] = null;
     try {
-      const data = (await getProfileByUserId(userId)) as PublicProfile;
-      profileCache.current.set(userId, data);
-      setProfileData(data);
-
-      // sincronizează și avatar map, ca să apară peste tot
-      setAvatars((m) => ({ ...m, [userId]: data.avatarUrl || null }));
-    } catch (e) {
-      console.error(e);
-      setProfileData(null);
-      setProfileError("Could not load profile.");
-    } finally {
-      setProfileLoading(false);
-    }
-  };
-
-  const closeProfile = () => {
-    setProfileUser(null);
-    setProfileData(null);
-    setProfileLoading(false);
-    setProfileError("");
-  };
-
-  useEffect(() => {
-    if (!profileUser) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeProfile();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileUser]);
-
-  const onMessageFromProfile = async (otherUserId: number) => {
-    try {
-      const { conversationId } = await getOrCreateDirectConversation(otherUserId);
-      closeProfile();
-      nav(`/messages?c=${conversationId}`);
-    } catch (e) {
-      console.error(e);
-      alert("Could not start conversation.");
+      const p = await getProfileByUserId(userId);
+      const url = (p as any)?.avatarUrl ?? null;
+      avatarsRef.current[userId] = url;
+      setAvatars({ ...avatarsRef.current });
+    } catch {
+      avatarsRef.current[userId] = null;
+      setAvatars({ ...avatarsRef.current });
     }
   };
 
@@ -585,56 +520,24 @@ export default function ProjectsPage() {
     setLoadingMy(true);
     try {
       const data = await getMyProjects();
-      setMyProjects(Array.isArray(data) ? data : []);
+      setMyProjects(data || []);
+      (data || []).forEach((p) => fetchAvatar((p as any)?.userId));
     } finally {
       setLoadingMy(false);
     }
   };
 
-  const refreshExplore = async (pageToLoad = 0) => {
+  const refreshExplore = async (pageToLoad: number) => {
     setLoadingExplore(true);
     try {
       const data = await getAllProjects(q, pageToLoad, 12);
-      const p = pickPage<ProjectDto>(data as any);
+      const { items, pageIndex, hasMore } = pickPage<ProjectDto>(data);
 
-      setExplore(p.items);
-      setExplorePage(p.pageIndex);
-      setExploreHasMore(p.hasMore);
+      setExplore(items);
+      setExplorePage(pageIndex);
+      setExploreHasMore(hasMore);
 
-      // prefetch avataruri pentru proiectele din pagină
-      p.items.forEach((it: any) => {
-        const uid = (it as any).userId ?? null;
-        if (uid) ensureAvatar(uid);
-      });
-    } finally {
-      setLoadingExplore(false);
-    }
-  };
-
-  const loadMoreExplore = async () => {
-    if (loadingExplore) return;
-    setLoadingExplore(true);
-    try {
-      const nextPage = explorePage + 1;
-      const data = await getAllProjects(q, nextPage, 12);
-      const p = pickPage<ProjectDto>(data as any);
-
-      setExplore((prev) => {
-        const seen = new Set(prev.map((x) => x.id));
-        const merged = [...prev];
-        for (const it of p.items) {
-          if (!seen.has(it.id)) merged.push(it);
-        }
-        return merged;
-      });
-
-      setExplorePage(p.pageIndex);
-      setExploreHasMore(p.hasMore);
-
-      p.items.forEach((it: any) => {
-        const uid = (it as any).userId ?? null;
-        if (uid) ensureAvatar(uid);
-      });
+      items.forEach((p) => fetchAvatar((p as any)?.userId));
     } finally {
       setLoadingExplore(false);
     }
@@ -643,7 +546,7 @@ export default function ProjectsPage() {
   useEffect(() => {
     refreshMy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     if (tab === "explore") refreshExplore(0);
@@ -651,7 +554,6 @@ export default function ProjectsPage() {
   }, [tab]);
 
   const buildPayload = (d: Draft): ProjectRequest => {
-    const partners = normList(d.partners);
     return {
       title: norm(d.title),
       acronym: norm(d.acronym) || undefined,
@@ -662,36 +564,16 @@ export default function ProjectsPage() {
       startDate: norm(d.startDate) || undefined,
       endDate: norm(d.endDate) || undefined,
       possibleExtensionEndDate: norm(d.possibleExtensionEndDate) || undefined,
-      partners: partners.length ? partners : undefined
+      partners: normList(d.partners)
     };
-  };
-
-  const startEdit = (p: ProjectDto) => {
-    setEditingId(p.id ?? null);
-    setEditing({
-      title: p.title || "",
-      acronym: p.acronym || "",
-      abstractEn: p.abstractEn || "",
-      coordinator: p.coordinator || "",
-      contractNumber: (p as any).contractNumber || "",
-      url: p.url || "",
-      startDate: p.startDate || "",
-      endDate: p.endDate || "",
-      possibleExtensionEndDate: (p.possibleExtensionEndDate as any) || "",
-      partners: Array.isArray(p.partners) && p.partners.length ? p.partners : [""]
-    });
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditing(emptyDraft);
   };
 
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await createProject(buildPayload(draft));
+      const payload = buildPayload(draft);
+      await createProject(payload);
       setDraft(emptyDraft);
       await refreshMy();
       if (tab === "explore") await refreshExplore(0);
@@ -700,13 +582,37 @@ export default function ProjectsPage() {
     }
   };
 
+  const startEdit = (p: ProjectDto) => {
+    setEditingId(p.id);
+    setEditing({
+      title: p.title || "",
+      acronym: p.acronym || "",
+      abstractEn: p.abstractEn || "",
+      coordinator: p.coordinator || "",
+      contractNumber: p.contractNumber || "",
+      url: p.url || "",
+      startDate: p.startDate || "",
+      endDate: p.endDate || "",
+      possibleExtensionEndDate: (p.possibleExtensionEndDate as any) || "",
+      partners: p.partners?.length ? [...p.partners] : [""]
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditing(emptyDraft);
+  };
+
   const onSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingId) return;
+
     setSaving(true);
     try {
-      await updateProject(editingId, buildPayload(editing));
-      cancelEdit();
+      const payload = buildPayload(editing);
+      await updateProject(editingId, payload);
+      setEditingId(null);
+      setEditing(emptyDraft);
       await refreshMy();
       if (tab === "explore") await refreshExplore(0);
     } finally {
@@ -714,21 +620,13 @@ export default function ProjectsPage() {
     }
   };
 
-  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id: number | null; title: string }>({
-    open: false,
-    id: null,
-    title: ""
-  });
-
   const onDeleteAsk = (id: number, title: string) => {
-    setConfirmDelete({ open: true, id, title: title || "this project" });
+    setConfirmDelete({ open: true, id, title });
   };
 
   const onDeleteConfirm = async () => {
     const id = confirmDelete.id;
-    if (!id) return;
-
-    setConfirmDelete({ open: false, id: null, title: "" });
+    setConfirmDelete({ open: false, id: 0, title: "" });
 
     setSaving(true);
     try {
@@ -740,168 +638,290 @@ export default function ProjectsPage() {
     }
   };
 
-  // avatar pentru proiectul din details modal
+  const openProfile = async (uid: number, name: string, role: string) => {
+    setProfileUser({ id: uid, name, role });
+    setProfileLoading(true);
+    setProfileError("");
+    setProfileData(null);
+
+    try {
+      const p = await getProfileByUserId(uid);
+      setProfileData((p as any) ?? null);
+    } catch {
+      setProfileError("Failed to load profile.");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const closeProfile = () => {
+    setProfileUser(null);
+    setProfileData(null);
+    setProfileError("");
+  };
+
+  const onMessageFromProfile = async (otherUserId: number) => {
+    try {
+      const { conversationId } = await getOrCreateDirectConversation(otherUserId);
+      closeProfile();
+      nav(`/messages?c=${conversationId}`);
+    } catch {
+      closeProfile();
+      nav("/messages");
+    }
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (detailsProject) setDetailsProject(null);
+        else if (profileUser) closeProfile();
+        else if (confirmDelete.open) setConfirmDelete({ open: false, id: 0, title: "" });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailsProject, profileUser, confirmDelete.open]);
+
   const detailsOwnerId = (detailsProject as any)?.userId ?? null;
   const detailsOwnerAvatar = detailsOwnerId ? avatars[detailsOwnerId] ?? null : null;
 
   return (
-    <div className="page">
-      <div className="pageHead">
-        <div className="pageTitle">Projects</div>
+    <>
+      <div className="page">
+        <div className="pageHead">
+          <div className="pageTitle">Projects</div>
 
-        <div className="tabs">
-          <button type="button" className={tab === "my" ? "tab tab-active" : "tab"} onClick={() => setTab("my")}>
-            My projects
-          </button>
-          <button type="button" className={tab === "explore" ? "tab tab-active" : "tab"} onClick={() => setTab("explore")}>
-            Explore
-          </button>
+          <div className="tabs">
+            <button type="button" className={tab === "my" ? "tab tab-active" : "tab"} onClick={() => setTab("my")}>
+              My projects
+            </button>
+            <button
+              type="button"
+              className={tab === "explore" ? "tab tab-active" : "tab"}
+              onClick={() => setTab("explore")}
+            >
+              Explore
+            </button>
+          </div>
         </div>
-      </div>
 
-      {tab === "my" ? (
-        <div className="grid2">
-          {/* Add new */}
-          <div className="card">
-            <div className="cardTitle">Add project</div>
+        {tab === "my" ? (
+          <div className="grid2">
+            <div className="card">
+              <div className="cardTitle">Add project</div>
 
-            <form onSubmit={onCreate} className="form">
-              <div className="row2">
-                <div>
-                  <div className="label">Title</div>
-                  <input className="ecoInput" value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} required />
+              <form onSubmit={onCreate} className="form">
+                <div className="row2">
+                  <div>
+                    <div className="label">Title</div>
+                    <input
+                      className="ecoInput"
+                      value={draft.title}
+                      onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <div className="label">Acronym</div>
+                    <input
+                      className="ecoInput"
+                      value={draft.acronym}
+                      onChange={(e) => setDraft((d) => ({ ...d, acronym: e.target.value }))}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <div className="label">Acronym</div>
-                  <input className="ecoInput" value={draft.acronym} onChange={(e) => setDraft((d) => ({ ...d, acronym: e.target.value }))} />
-                </div>
-              </div>
 
-              <div className="row2">
-                <div>
-                  <div className="label">Start date</div>
-                  <input type="date" className="ecoInput" value={draft.startDate} onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))} />
+                <div className="row2">
+                  <div>
+                    <div className="label">Start date</div>
+                    <input
+                      type="date"
+                      className="ecoInput"
+                      value={draft.startDate}
+                      onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <div className="label">End date</div>
+                    <input
+                      type="date"
+                      className="ecoInput"
+                      value={draft.endDate}
+                      onChange={(e) => setDraft((d) => ({ ...d, endDate: e.target.value }))}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <div className="label">End date</div>
-                  <input type="date" className="ecoInput" value={draft.endDate} onChange={(e) => setDraft((d) => ({ ...d, endDate: e.target.value }))} />
-                </div>
-              </div>
 
-              <div className="row2">
+                <div className="row2">
+                  <div>
+                    <div className="label">Possible extension end</div>
+                    <input
+                      type="date"
+                      className="ecoInput"
+                      value={draft.possibleExtensionEndDate}
+                      onChange={(e) => setDraft((d) => ({ ...d, possibleExtensionEndDate: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <div className="label">Contract number</div>
+                    <input
+                      className="ecoInput"
+                      value={draft.contractNumber}
+                      onChange={(e) => setDraft((d) => ({ ...d, contractNumber: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="row2">
+                  <div>
+                    <div className="label">Coordinator</div>
+                    <input
+                      className="ecoInput"
+                      value={draft.coordinator}
+                      onChange={(e) => setDraft((d) => ({ ...d, coordinator: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <div className="label">URL</div>
+                    <input
+                      className="ecoInput"
+                      value={draft.url}
+                      onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <div className="label">Possible extension end</div>
-                  <input
-                    type="date"
+                  <div className="label">Partners</div>
+                  <div className="partners">
+                    {draft.partners.map((val, idx) => (
+                      <div key={idx} className="partnerRow">
+                        <input
+                          className="ecoInput"
+                          value={val}
+                          onChange={(e) =>
+                            setDraft((d) => {
+                              const next = [...d.partners];
+                              next[idx] = e.target.value;
+                              return { ...d, partners: next };
+                            })
+                          }
+                          placeholder={idx === 0 ? "Partner" : `Partner #${idx + 1}`}
+                        />
+                        <button
+                          type="button"
+                          className="btn-outline"
+                          onClick={() =>
+                            setDraft((d) => {
+                              const next = d.partners.filter((_, i) => i !== idx);
+                              return { ...d, partners: next.length ? next : [""] };
+                            })
+                          }
+                          title="Remove"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn-outline"
+                      onClick={() => setDraft((d) => ({ ...d, partners: [...d.partners, ""] }))}
+                      disabled={saving}
+                    >
+                      Add partner
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="label">Abstract</div>
+                  <textarea
                     className="ecoInput"
-                    value={draft.possibleExtensionEndDate}
-                    onChange={(e) => setDraft((d) => ({ ...d, possibleExtensionEndDate: e.target.value }))}
+                    value={draft.abstractEn}
+                    onChange={(e) => setDraft((d) => ({ ...d, abstractEn: e.target.value }))}
+                    rows={5}
                   />
                 </div>
-                <div>
-                  <div className="label">Contract number</div>
-                  <input className="ecoInput" value={draft.contractNumber} onChange={(e) => setDraft((d) => ({ ...d, contractNumber: e.target.value }))} />
-                </div>
-              </div>
 
-              <div className="row2">
-                <div>
-                  <div className="label">Coordinator</div>
-                  <input className="ecoInput" value={draft.coordinator} onChange={(e) => setDraft((d) => ({ ...d, coordinator: e.target.value }))} />
-                </div>
-                <div>
-                  <div className="label">URL</div>
-                  <input className="ecoInput" value={draft.url} onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))} placeholder="https://…" />
-                </div>
-              </div>
-
-              {/* Partners (multiple) */}
-              <div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                  <div className="label" style={{ margin: 0 }}>
-                    Partners
-                  </div>
-                  <button type="button" className="btn-outline" onClick={() => setDraft((d) => ({ ...d, partners: [...d.partners, ""] }))}>
-                    + Add partner
+                <div className="actions">
+                  <button className="btn" type="submit" disabled={saving}>
+                    Create
+                  </button>
+                  <button className="btn-outline" type="button" onClick={() => setDraft(emptyDraft)} disabled={saving}>
+                    Reset
                   </button>
                 </div>
+              </form>
+            </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {draft.partners.map((val, idx) => (
-                    <div key={idx} style={{ display: "flex", gap: 8 }}>
-                      <input
-                        className="ecoInput"
-                        value={val}
-                        onChange={(e) =>
-                          setDraft((d) => {
-                            const next = [...d.partners];
-                            next[idx] = e.target.value;
-                            return { ...d, partners: next };
-                          })
-                        }
-                        placeholder={idx === 0 ? "Partner" : `Partner #${idx + 1}`}
-                      />
-                      <button
-                        type="button"
-                        className="btn-outline"
-                        onClick={() =>
-                          setDraft((d) => {
-                            const next = d.partners.filter((_, i) => i !== idx);
-                            return { ...d, partners: next.length ? next : [""] };
-                          })
-                        }
-                        title="Remove"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="card">
+              <div className="cardTitle">My projects</div>
 
-              <div>
-                <div className="label">Abstract</div>
-                <textarea className="ecoInput" value={draft.abstractEn} onChange={(e) => setDraft((d) => ({ ...d, abstractEn: e.target.value }))} rows={5} />
-              </div>
+              {loadingMy ? <div className="hint">Loading…</div> : null}
+              {!loadingMy && !myProjects.length ? <div className="hint">No projects yet.</div> : null}
 
-              <div className="actions">
-                <button className="btn" type="submit" disabled={saving}>
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
+              {!loadingMy && myProjects.length ? (
+                <div className="list">
+                  {myProjects.map((p) => {
+                    const isEditing = editingId === p.id;
+                    const uid = (p as any)?.userId ?? null;
+                    const avatarUrl = uid ? avatars[uid] ?? null : null;
 
-          {/* List my */}
-          <div className="card">
-            <div className="cardTitle">My projects</div>
-
-            {loadingMy ? (
-              <div className="muted">Loading…</div>
-            ) : myProjects.length === 0 ? (
-              <div className="muted">No projects yet.</div>
-            ) : (
-              <div className="list">
-                {myProjects.map((p) => {
-                  const id = p.id ?? 0;
-                  const isEditing = editingId === id;
-
-                  return (
-                    <div key={id} className="item cardSub">
-                      {!isEditing ? (
-                        <>
-                          <div className="itemHead">
-                            <div className="itemTitle">{p.title}</div>
-                            <div className="itemBtns">
-                              <button type="button" className="btn-outline" onClick={() => startEdit(p)} disabled={saving}>
-                                Edit
-                              </button>
-                              <button type="button" className="btn-outline danger" onClick={() => onDeleteAsk(id, p.title)} disabled={saving}>
-                                Delete
-                              </button>
+                    return (
+                      <div key={p.id} className="item cardSub">
+                        <div className="itemHead">
+                          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                            <div
+                              className="avatarSmall"
+                              style={
+                                avatarUrl
+                                  ? {
+                                      backgroundImage: `url(${avatarUrl})`,
+                                      backgroundSize: "cover",
+                                      backgroundPosition: "center",
+                                      backgroundRepeat: "no-repeat"
+                                    }
+                                  : undefined
+                              }
+                            />
+                            <div>
+                              <div className="itemTitle">{p.title}</div>
+                              {p.acronym ? <div className="muted">{p.acronym}</div> : null}
                             </div>
                           </div>
 
+                          <div className="itemBtns">
+                            <button
+                              type="button"
+                              className="btn-outline"
+                              onClick={() => setDetailsProject(p)}
+                              disabled={saving}
+                            >
+                              Details
+                            </button>
+
+                            {!isEditing ? (
+                              <>
+                                <button type="button" className="btn-outline" onClick={() => startEdit(p)} disabled={saving}>
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-outline danger"
+                                  onClick={() => onDeleteAsk(p.id, p.title)}
+                                  disabled={saving}
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {!isEditing ? (
                           <div className="projectDetails">
                             {p.startDate && p.endDate ? (
                               <div>
@@ -921,284 +941,286 @@ export default function ProjectsPage() {
                               </div>
                             ) : null}
                           </div>
-                        </>
-                      ) : (
-                      <form onSubmit={onSaveEdit} className="form">
-                        <div className="row2">
-                          <div>
-                            <div className="label">Title</div>
-                            <input
-                              className="ecoInput"
-                              value={editing.title}
-                              onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))}
-                              required
-                            />
-                          </div>
-                          <div>
-                            <div className="label">Acronym</div>
-                            <input
-                              className="ecoInput"
-                              value={editing.acronym}
-                              onChange={(e) => setEditing((d) => ({ ...d, acronym: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="row2">
-                          <div>
-                            <div className="label">Start date</div>
-                            <input
-                              type="date"
-                              className="ecoInput"
-                              value={editing.startDate}
-                              onChange={(e) => setEditing((d) => ({ ...d, startDate: e.target.value }))}
-                            />
-                          </div>
-                          <div>
-                            <div className="label">End date</div>
-                            <input
-                              type="date"
-                              className="ecoInput"
-                              value={editing.endDate}
-                              onChange={(e) => setEditing((d) => ({ ...d, endDate: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="row2">
-                          <div>
-                            <div className="label">Possible extension end</div>
-                            <input
-                              type="date"
-                              className="ecoInput"
-                              value={editing.possibleExtensionEndDate}
-                              onChange={(e) =>
-                                setEditing((d) => ({ ...d, possibleExtensionEndDate: e.target.value }))
-                              }
-                            />
-                          </div>
-                          <div>
-                            <div className="label">Contract number</div>
-                            <input
-                              className="ecoInput"
-                              value={editing.contractNumber}
-                              onChange={(e) => setEditing((d) => ({ ...d, contractNumber: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="row2">
-                          <div>
-                            <div className="label">Coordinator</div>
-                            <input
-                              className="ecoInput"
-                              value={editing.coordinator}
-                              onChange={(e) => setEditing((d) => ({ ...d, coordinator: e.target.value }))}
-                            />
-                          </div>
-                          <div>
-                            <div className="label">URL</div>
-                            <input
-                              className="ecoInput"
-                              value={editing.url}
-                              onChange={(e) => setEditing((d) => ({ ...d, url: e.target.value }))}
-                              placeholder="https://…"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Partners (multiple) */}
-                        <div>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              marginBottom: 6
-                            }}
-                          >
-                            <div className="label" style={{ margin: 0 }}>
-                              Partners
-                            </div>
-                            <button
-                              type="button"
-                              className="btn-outline"
-                              onClick={() => setEditing((d) => ({ ...d, partners: [...d.partners, ""] }))}
-                            >
-                              + Add partner
-                            </button>
-                          </div>
-
-                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            {editing.partners.map((val, idx) => (
-                              <div key={idx} style={{ display: "flex", gap: 8 }}>
+                        ) : (
+                          <form onSubmit={onSaveEdit} className="form" style={{ marginTop: 10 }}>
+                            <div className="row2">
+                              <div>
+                                <div className="label">Title</div>
                                 <input
                                   className="ecoInput"
-                                  value={val}
-                                  onChange={(e) =>
-                                    setEditing((d) => {
-                                      const next = [...d.partners];
-                                      next[idx] = e.target.value;
-                                      return { ...d, partners: next };
-                                    })
-                                  }
-                                  placeholder={idx === 0 ? "Partner" : `Partner #${idx + 1}`}
+                                  value={editing.title}
+                                  onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))}
+                                  required
                                 />
-                                <button
-                                  type="button"
-                                  className="btn-outline"
-                                  onClick={() =>
-                                    setEditing((d) => {
-                                      const next = d.partners.filter((_, i) => i !== idx);
-                                      return { ...d, partners: next.length ? next : [""] };
-                                    })
-                                  }
-                                  title="Remove"
-                                >
-                                  ×
-                                </button>
                               </div>
-                            ))}
-                          </div>
-                        </div>
+                              <div>
+                                <div className="label">Acronym</div>
+                                <input
+                                  className="ecoInput"
+                                  value={editing.acronym}
+                                  onChange={(e) => setEditing((d) => ({ ...d, acronym: e.target.value }))}
+                                />
+                              </div>
+                            </div>
 
-                        <div>
-                          <div className="label">Abstract</div>
-                          <textarea
-                            className="ecoInput"
-                            value={editing.abstractEn}
-                            onChange={(e) => setEditing((d) => ({ ...d, abstractEn: e.target.value }))}
-                            rows={5}
-                          />
-                        </div>
+                            <div className="row2">
+                              <div>
+                                <div className="label">Start date</div>
+                                <input
+                                  type="date"
+                                  className="ecoInput"
+                                  value={editing.startDate}
+                                  onChange={(e) => setEditing((d) => ({ ...d, startDate: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <div className="label">End date</div>
+                                <input
+                                  type="date"
+                                  className="ecoInput"
+                                  value={editing.endDate}
+                                  onChange={(e) => setEditing((d) => ({ ...d, endDate: e.target.value }))}
+                                />
+                              </div>
+                            </div>
 
-                        <div className="actions">
-                          <button className="btn-outline" type="button" onClick={cancelEdit} disabled={saving}>
-                            Cancel
-                          </button>
-                          <button className="btn" type="submit" disabled={saving}>
-                            Save
-                          </button>
-                        </div>
-                      </form>
-                    )
-                    }
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                            <div className="row2">
+                              <div>
+                                <div className="label">Possible extension end</div>
+                                <input
+                                  type="date"
+                                  className="ecoInput"
+                                  value={editing.possibleExtensionEndDate}
+                                  onChange={(e) => setEditing((d) => ({ ...d, possibleExtensionEndDate: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <div className="label">Contract number</div>
+                                <input
+                                  className="ecoInput"
+                                  value={editing.contractNumber}
+                                  onChange={(e) => setEditing((d) => ({ ...d, contractNumber: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="row2">
+                              <div>
+                                <div className="label">Coordinator</div>
+                                <input
+                                  className="ecoInput"
+                                  value={editing.coordinator}
+                                  onChange={(e) => setEditing((d) => ({ ...d, coordinator: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <div className="label">URL</div>
+                                <input
+                                  className="ecoInput"
+                                  value={editing.url}
+                                  onChange={(e) => setEditing((d) => ({ ...d, url: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="label">Partners</div>
+                              <div className="partners">
+                                {editing.partners.map((val, idx) => (
+                                  <div key={idx} className="partnerRow">
+                                    <input
+                                      className="ecoInput"
+                                      value={val}
+                                      onChange={(e) =>
+                                        setEditing((d) => {
+                                          const next = [...d.partners];
+                                          next[idx] = e.target.value;
+                                          return { ...d, partners: next };
+                                        })
+                                      }
+                                      placeholder={idx === 0 ? "Partner" : `Partner #${idx + 1}`}
+                                    />
+                                    <button
+                                      type="button"
+                                      className="btn-outline"
+                                      onClick={() =>
+                                        setEditing((d) => {
+                                          const next = d.partners.filter((_, i) => i !== idx);
+                                          return { ...d, partners: next.length ? next : [""] };
+                                        })
+                                      }
+                                      title="Remove"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="label">Abstract</div>
+                              <textarea
+                                className="ecoInput"
+                                value={editing.abstractEn}
+                                onChange={(e) => setEditing((d) => ({ ...d, abstractEn: e.target.value }))}
+                                rows={5}
+                              />
+                            </div>
+
+                            <div className="actions">
+                              <button className="btn-outline" type="button" onClick={cancelEdit} disabled={saving}>
+                                Cancel
+                              </button>
+                              <button className="btn" type="submit" disabled={saving}>
+                                Save
+                              </button>
+                            </div>
+                          </form>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
           </div>
+        ) : (
+  <div className="grid2 exploreGrid">
+    
+    <div className="card exploreCard">
+      <div className="cardTitle">Explore projects</div>
+
+      <div className="row2" style={{ marginBottom: 12 }}>
+        <div>
+          <div className="label">Search</div>
+          <input className="ecoInput" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" />
         </div>
-      ) : (
-        // Explore tab
-        <div className="card">
-          <div className="cardTitle">Explore</div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
+          <button className="btn-outline" type="button" onClick={() => refreshExplore(0)} disabled={loadingExplore}>
+            Search
+          </button>
+        </div>
+      </div>
 
-          <div className="searchRow">
-            <input className="ecoInput" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search projects…" />
-            <button type="button" className="btn-outline" onClick={() => refreshExplore(0)} disabled={loadingExplore || saving}>
-              Search
-            </button>
-          </div>
+      {loadingExplore ? <div className="hint">Loading…</div> : null}
+      {!loadingExplore && !explore.length ? <div className="hint">No projects.</div> : null}
 
-          {loadingExplore ? (
-            <div className="muted">Loading…</div>
-          ) : explore.length === 0 ? (
-            <div className="muted">No results.</div>
-          ) : (
-            <div className="list">
-              {explore.map((p) => {
-                const id = p.id ?? 0;
-                const uid = (p as any).userId ?? null;
-                const avatarUrl = uid ? avatars[uid] ?? null : null;
+      {!loadingExplore && explore.length ? (
+        <div className="list exploreList">
+          {explore.map((p) => {
+            const id = p.id ?? 0;
+            const uid = (p as any).userId ?? null;
+            const avatarUrl = uid ? avatars[uid] ?? null : null;
 
-                return (
-                  <div key={id} className="item cardSub">
-                    <div className="itemHead">
-                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <div
-                        className="avatarSmall"
-                        style={
-                          avatarUrl
-                            ? {
-                                backgroundImage: `url(${avatarUrl})`,
-                                backgroundSize: "cover",
-                                backgroundPosition: "center",
-                                backgroundRepeat: "no-repeat"
-                              }
-                            : undefined
-                        }
-                      />
-                        <div>
-                          <div className="itemTitle">{p.title}</div>
-                          {p.acronym ? <div className="muted">{p.acronym}</div> : null}
-                        </div>
-                      </div>
-
-                      <div className="itemBtns">
-                        <button type="button" className="btn-outline" onClick={() => setDetailsProject(p)} disabled={saving} title="Details">
-                          Details
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Explore shows ONLY Title + Timeline + Abstract */}
-                    <div className="projectDetails">
-                      {p.startDate && p.endDate ? (
-                        <div>
-                          <span className="k">Timeline:</span> {p.startDate} → {p.endDate}
-                          {p.possibleExtensionEndDate ? (
-                            <>
-                              {" "}
-                              <span className="k">Ext:</span> {p.possibleExtensionEndDate}
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
-
-                      {p.abstractEn ? (
-                        <div style={{ marginTop: 8 }}>
-                          <span className="k">Abstract:</span> {p.abstractEn}
-                        </div>
-                      ) : null}
+            return (
+              <div key={id} className="item cardSub">
+                <div className="itemHead">
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <div
+                      className="avatarSmall"
+                      style={
+                        avatarUrl
+                          ? {
+                              backgroundImage: `url(${avatarUrl})`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                              backgroundRepeat: "no-repeat"
+                            }
+                          : undefined
+                      }
+                    />
+                    <div>
+                      <div className="itemTitle">{p.title}</div>
+                      {p.acronym ? <div className="muted">{p.acronym}</div> : null}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
 
-          {exploreHasMore ? (
-            <div className="annMore">
-              <button type="button" className="btn-outline" onClick={loadMoreExplore} disabled={loadingExplore}>
-                Load more
-              </button>
-            </div>
-          ) : null}
+                  <div className="itemBtns">
+                    <button type="button" className="btn-outline" onClick={() => setDetailsProject(p)} disabled={saving}>
+                      Details
+                    </button>
 
-          <ProjectDetailsModal
-            project={detailsProject}
-            ownerAvatarUrl={detailsOwnerAvatar}
-            onClose={() => setDetailsProject(null)}
-            onOpenProfile={(uid, name, role) => {
-              setDetailsProject(null);
-              if (uid) openProfile(uid, name, role);
-            }}
-          />
+                    <button type="button" className="btn-outline danger" onClick={() => onDeleteAsk(p.id, p.title)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
 
-          {profileUser && (
-            <ProfileModal
-              user={profileUser}
-              loading={profileLoading}
-              error={profileError}
-              profile={profileData}
-              onClose={closeProfile}
-              currentUserId={currentUserId}
-              onMessage={onMessageFromProfile}
-            />
-          )}
+                <div className="projectDetails">
+                  {p.startDate && p.endDate ? (
+                    <div>
+                      <span className="k">Timeline:</span> {p.startDate} → {p.endDate}
+                      {p.possibleExtensionEndDate ? (
+                        <>
+                          {" "}
+                          <span className="k">Ext:</span> {p.possibleExtensionEndDate}
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {p.abstractEn ? (
+                    <div style={{ marginTop: 8 }}>
+                      <span className="k">Abstract:</span> {p.abstractEn}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
+      ) : null}
+
+      <div className="pager">
+        <button
+          type="button"
+          className="btn-outline"
+          onClick={() => refreshExplore(Math.max(0, explorePage - 1))}
+          disabled={loadingExplore || saving || explorePage <= 0}
+        >
+          Prev
+        </button>
+
+        <button
+          type="button"
+          className="btn-outline"
+          onClick={() => refreshExplore(explorePage + 1)}
+          disabled={loadingExplore || saving || !exploreHasMore}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  </div>
+)
+
+        
+        
+        
+        }
+      </div>
+
+      <ProjectDetailsModal
+        project={detailsProject}
+        ownerAvatarUrl={detailsOwnerAvatar}
+        onClose={() => setDetailsProject(null)}
+        onOpenProfile={(uid, name, role) => {
+          setDetailsProject(null);
+          if (uid) openProfile(uid, name, role);
+        }}
+      />
+
+      {profileUser && (
+        <ProfileModal
+          user={profileUser}
+          loading={profileLoading}
+          error={profileError}
+          profile={profileData}
+          onClose={closeProfile}
+          currentUserId={currentUserId}
+          onMessage={onMessageFromProfile}
+        />
       )}
 
       <ConfirmModal
@@ -1209,10 +1231,10 @@ export default function ProjectsPage() {
         cancelText="Cancel"
         danger
         busy={saving}
-        onCancel={() => setConfirmDelete({ open: false, id: null, title: "" })}
+        onCancel={() => setConfirmDelete({ open: false, id: 0, title: "" })}
         onConfirm={onDeleteConfirm}
       />
-    </div>
+    </>
   );
 }
 
@@ -1256,11 +1278,10 @@ function ConfirmModal({
 
         <div className="annConfirmMsg">{message}</div>
 
-        <div className="annConfirmActions">
-          <button className="btn-outline" type="button" onClick={onCancel} disabled={busy}>
+        <div className="annConfirmFoot">
+          <button type="button" onClick={onCancel} disabled={busy} className="annSecondaryBtn">
             {cancelText}
           </button>
-
           <button type="button" onClick={onConfirm} disabled={busy} className={danger ? "annDangerBtn" : "annPrimaryBtn"}>
             {confirmText}
           </button>

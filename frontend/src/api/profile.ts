@@ -53,3 +53,27 @@ export const saveAvatarUrl = async (avatarUrl: string) => {
   const res = await api.put("/api/profile/me/avatar", { avatarUrl });
   return res.data;
 };
+
+export const uploadMyCv = async (file: File) => {
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await api.put("/api/profile/me/cv/upload", form, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+
+  return res.data as { cvUrl: string };
+};
+
+export const openCv = async (cvUrl: string) => {
+  const res = await api.get(cvUrl, { responseType: "blob" });
+
+  const blob = new Blob([res.data], {
+    type: res.headers["content-type"] || "application/octet-stream"
+  });
+
+  const url = window.URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+};

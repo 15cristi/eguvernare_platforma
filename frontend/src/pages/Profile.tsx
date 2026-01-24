@@ -6,6 +6,7 @@ import { suggestLookup, upsertLookup } from "../api/lookups";
 import type { LookupCategory } from "../api/lookups";
 import { uploadAvatarToCloudinary } from "../api/cloudinary";
 import { SinglePicker } from "../components/SinglePicker";
+import { uploadMyCv, openCv } from "../api/profile";
 
 type Availability = "FULL_TIME" | "PART_TIME" | "WEEKENDS";
 type ExperienceLevel = "JUNIOR" | "MID" | "SENIOR";
@@ -55,11 +56,17 @@ interface Profile {
   website: string;
 
   avatarUrl?: string;
+  cvUrl?: string;
+
 }
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ");
 const suggest = (category: LookupCategory, q: string) => suggestLookup(category, q);
 const upsert = (category: LookupCategory, value: string) => upsertLookup(category, value);
+
+
+
+
 
 // Stable id generator (works in modern browsers; fallback included)
 const makeId = () =>
@@ -110,6 +117,8 @@ export default function ProfilePage() {
           expertAreas: data.expertAreas || [],
           expertise,
           resources,
+          cvUrl: data.cvUrl,
+
 
           companyName: data.companyName || "",
           companyDescription: data.companyDescription || "",
@@ -154,6 +163,8 @@ export default function ProfilePage() {
       p.website,
       p.avatarUrl,
       p.expertise,
+      p.cvUrl,
+
       p.resources,
       p.companyName,
       p.companyDescription,
@@ -206,6 +217,7 @@ export default function ProfilePage() {
         expertAreas: profile.expertAreas,
         expertise: profile.expertise.map((x) => ({ area: x.area, description: x.description })),
         resources: profile.resources.map((x) => ({ title: x.title, description: x.description, url: x.url })),
+        cvUrl: profile.cvUrl && !profile.cvUrl.startsWith("blob:") ? profile.cvUrl : undefined,
 
         companyName: profile.companyName,
         companyDescription: profile.companyDescription,
@@ -295,6 +307,50 @@ export default function ProfilePage() {
                 <div style={{ width: `${strength}%` }} />
               </div>
             </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                disabled={uploading}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+
+                  setUploading(true);
+                  try {
+                    const { cvUrl } = await uploadMyCv(file);
+                    update("cvUrl", cvUrl);
+                  } finally {
+                    setUploading(false);
+                  }
+                }}
+              />
+
+              {profile.cvUrl ? (
+                <button
+              type="button"
+              className="btnSecondary"
+              disabled={!profile.cvUrl || uploading}
+              onClick={async () => {
+                if (!profile.cvUrl) return;
+                try {
+                  await openCv(profile.cvUrl);
+                } catch (e) {
+                  console.error(e);
+                  alert("Could not open CV");
+                }
+              }}
+            >
+              View CV
+            </button>
+
+              ) : (
+                <small className="hint">No CV uploaded</small>
+              )}
+            </div>
+
+
           </div>
         </div>
       </div>

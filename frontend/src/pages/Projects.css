@@ -1,18 +1,22 @@
-/* ProjectsPage.css
-   Adaptare ca ExploreLists.css, dar pentru clasele folosite în Projects.tsx
+/* src/pages/Projects.css
+   Aliniat vizual cu Publications.css + header stabil (tabs nu se mișcă)
 */
+
+/* ========================================================================== */
+/*                               PAGE LAYOUT                                  */
+/* ========================================================================== */
 
 .page {
   padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
+/* Header stabil: title stânga, tabs mereu în dreapta */
 .pageHead {
-  max-width: 1200px;
   margin: 0 auto 16px auto;
-
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: center;
   gap: 16px;
 }
 
@@ -22,13 +26,17 @@
   letter-spacing: 0.2px;
   font-weight: 700;
   color: var(--text);
+  flex: 0 0 auto;
 }
 
-/* Tabs: map pe stilul projectsTabs + btn-outline */
+/* Tabs */
 .tabs {
+  margin-left: auto;           /* împinge în dreapta */
   display: inline-flex;
   gap: 10px;
-  flex-wrap: wrap;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  flex-wrap: nowrap;           /* nu se rup și nu “joacă” */
 }
 
 .tab {
@@ -42,11 +50,10 @@
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(232, 247, 241, 0.92);
+  white-space: nowrap;
 }
 
-.tab:active {
-  transform: translateY(1px);
-}
+.tab:active { transform: translateY(1px); }
 
 .tab:hover {
   background: rgba(255, 255, 255, 0.09);
@@ -58,38 +65,30 @@
   background: rgba(34, 197, 94, 0.16);
 }
 
-/* Grid 2 coloane ca .twoCol */
-.grid2 {
-  max-width: 1200px;
-  margin: 0 auto;
-
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  align-items: start;
-}
-
 @media (max-width: 980px) {
-  .grid2 {
-    grid-template-columns: 1fr;
-  }
-
-  .page {
-    padding: 16px;
-  }
+  .page { padding: 16px; }
 
   .pageHead {
-    flex-direction: column;
-    align-items: stretch;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .tabs {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap; /* pe mobil e ok */
   }
 }
 
-/* Card-ul principal: identic cu ExploreLists.css */
+/* ========================================================================== */
+/*                                   CARD                                     */
+/* ========================================================================== */
+
 .card {
   border-radius: 18px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(2, 28, 22, 0.45);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(8px);
   padding: 16px;
 }
@@ -100,62 +99,84 @@
   color: var(--text);
 }
 
-/* Subcard pentru item (in My/Explore list) */
-.cardSub {
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(2, 28, 22, 0.55);
-  padding: 14px;
-  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+/* ========================================================================== */
+/*                                  GRID                                      */
+/* ========================================================================== */
+
+/* My projects (layout normal: formular stânga + listă dreapta) */
+.grid2 {
+  display: grid;
+  grid-template-columns: 560px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
 }
 
-.cardSub:hover {
-  transform: translateY(-1px);
-  border-color: rgba(34, 197, 94, 0.25);
-  background: rgba(2, 28, 22, 0.72);
+/* Explore: doar aici păstrăm “coloana fantomă” ca să înceapă cardul din dreapta
+   exact de unde începe și în My projects (după 560px). */
+
+
+.grid2.exploreGrid {
+  grid-template-columns: 1050px minmax(0, 1fr); /* <-- trage cardul mai spre stânga */
 }
 
-/* List layout */
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+
+/* Cardul din Explore să folosească toată coloana 2, fără width-uri nebune */
+.exploreCard {
+  width: 100%;
+  max-width: none;
+  justify-self: stretch;
 }
 
-.item {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* Pe mobile, o coloană ca să nu ai spații stupide */
+@media (max-width: 980px) {
+  .grid2,
+  .grid2.exploreGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ghostCol {
+    display: none;
+  }
 }
 
-.itemHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.itemTitle {
-  font-size: 15px;
-  line-height: 1.25;
-  font-weight: 700;
-  color: rgba(232, 247, 241, 0.95);
-}
-
-.itemBtns {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
+/* ========================================================================== */
+/*                           TEXT / UTILITIES                                 */
+/* ========================================================================== */
 
 .muted {
   color: var(--muted);
   font-size: 13px;
 }
 
-/* Inputs / textarea */
+.k {
+  opacity: 0.7;
+  margin-right: 6px;
+}
+
+.hint {
+  color: rgba(232, 247, 241, 0.70);
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 10px 0;
+}
+
+.error {
+  color: rgba(255, 190, 190, 0.92);
+  font-size: 13px;
+  line-height: 1.35;
+  border: 1px solid rgba(255, 120, 120, 0.20);
+  background: rgba(255, 120, 120, 0.08);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+/* ========================================================================== */
+/*                             INPUTS / FORMS                                 */
+/* ========================================================================== */
+
 textarea,
-input {
+input,
+select {
   font-family: inherit;
 }
 
@@ -170,16 +191,16 @@ input {
   height: 44px;
 }
 
+.ecoInput:focus {
+  border-color: rgba(34, 197, 94, 0.35);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.10);
+}
+
 textarea.ecoInput {
   height: 92px;
   padding-top: 10px;
   resize: vertical;
   min-height: 92px;
-}
-
-.ecoInput:focus {
-  border-color: rgba(34, 197, 94, 0.35);
-  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.10);
 }
 
 .label {
@@ -189,7 +210,6 @@ textarea.ecoInput {
   margin-bottom: 6px;
 }
 
-/* Row2 devine grid ca projGrid2 */
 .row2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -197,14 +217,29 @@ textarea.ecoInput {
 }
 
 @media (max-width: 980px) {
-  .row2 {
-    grid-template-columns: 1fr;
-  }
+  .row2 { grid-template-columns: 1fr; }
 }
 
-/* Buttons */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+/* partners rows */
+.partners { display: flex; flex-direction: column; gap: 10px; }
+.partnerRow { display: flex; gap: 10px; align-items: center; }
+.partnerRow .ecoInput { flex: 1; }
+
+/* ========================================================================== */
+/*                                  BUTTONS                                   */
+/* ========================================================================== */
+
 .btn-outline,
-.btn {
+.btn,
+.btn-primary {
   border-radius: 14px;
   height: 42px;
   padding: 0 14px;
@@ -214,7 +249,8 @@ textarea.ecoInput {
 }
 
 .btn-outline:active,
-.btn:active {
+.btn:active,
+.btn-primary:active {
   transform: translateY(1px);
 }
 
@@ -239,47 +275,81 @@ textarea.ecoInput {
   background: rgba(255, 120, 120, 0.10);
 }
 
-/* Buton primary (Save) */
-.btn {
+.btn,
+.btn-primary {
   border: 1px solid rgba(34, 197, 94, 0.35);
   background: rgba(34, 197, 94, 0.22);
   color: rgba(232, 247, 241, 0.95);
 }
 
-.btn:hover {
+.btn:hover,
+.btn-primary:hover {
   background: rgba(34, 197, 94, 0.28);
   border-color: rgba(34, 197, 94, 0.45);
 }
 
 .btn:disabled,
-.btn-outline:disabled {
+.btn-outline:disabled,
+.btn-primary:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   transform: none;
 }
 
-.actions {
+/* ========================================================================== */
+/*                                   LIST                                     */
+/* ========================================================================== */
+
+.list {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.14);
+
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cardSub {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(15, 43, 42, 0.55);
+  padding: 14px;
+}
+
+.itemHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.itemTitle {
+  font-size: 16px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: rgba(232, 247, 241, 0.95);
+}
+
+.itemBtns {
+  display: flex;
+  gap: 10px;
+  align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
+  flex-wrap: wrap;
 }
 
-/* Explore search row ca formRow */
-.searchRow {
-  display: grid;
-  grid-template-columns: 1fr 160px;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-@media (max-width: 520px) {
-  .searchRow {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Details text */
 .projectDetails {
   margin-top: 10px;
   color: rgba(232, 247, 241, 0.86);
@@ -287,12 +357,37 @@ textarea.ecoInput {
   line-height: 1.35;
 }
 
-.k {
-  opacity: 0.7;
-  margin-right: 6px;
+.avatarSmall {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.06);
+  flex: 0 0 auto;
 }
 
-/* Link */
+/* ========================================================================== */
+/*                                PAGINATION                                  */
+/* ========================================================================== */
+
+.pager {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.pager .btn-outline {
+  height: 40px;
+  border-radius: 12px;
+  padding: 0 14px;
+}
+
+/* ========================================================================== */
+/*                                   LINKS                                    */
+/* ========================================================================== */
+
+.annLink,
 .annInlineLink {
   color: rgba(167, 243, 208, 0.95);
   text-decoration: none;
@@ -301,11 +396,163 @@ textarea.ecoInput {
   padding-bottom: 1px;
 }
 
+.annLink:hover,
 .annInlineLink:hover {
   border-bottom-color: rgba(167, 243, 208, 0.75);
 }
 
-/* Modal: folosește exact stilul tău din ExploreLists.css */
+/* ========================================================================== */
+/*                             MODALS (PROFILE + DETAILS)                      */
+/* ========================================================================== */
+
+.annModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  padding: 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.annModal {
+  width: 100%;
+  max-width: 860px;
+  border-radius: 14px;
+  padding: 16px;
+
+  background: #0f2b2a;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  color: #eaf3f2;
+
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+.annModalHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.annModalTitle {
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.15;
+  color: rgba(232, 247, 241, 0.95);
+  min-width: 0;
+}
+
+.annModalSub {
+  margin-top: 2px;
+  font-size: 13px;
+  color: rgba(232, 247, 241, 0.72);
+}
+
+.annIconBtn {
+  width: 40px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(232, 247, 241, 0.92);
+  cursor: pointer;
+}
+
+.annIconBtn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.20);
+}
+
+.annModalBody {
+  padding-top: 12px;
+  overflow: auto;
+  max-height: calc(100vh - 180px);
+}
+
+.annModalFoot {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.annInfoBox {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.14);
+  padding: 12px;
+}
+
+.annInfoLabel {
+  font-size: 12px;
+  color: rgba(232, 247, 241, 0.70);
+  margin-bottom: 2px;
+}
+
+.annInfoValue {
+  color: rgba(232, 247, 241, 0.95);
+  font-weight: 650;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.annRow2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .annRow2 { grid-template-columns: 1fr; }
+  .annModalHead { flex-direction: column; align-items: stretch; }
+}
+
+.annResourceRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.annResourceRow:first-child { padding-top: 0; }
+.annResourceRow:last-child { padding-bottom: 0; border-bottom: none; }
+
+.annLinkBtn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(232, 247, 241, 0.92);
+  border-radius: 12px;
+  height: 38px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.annLinkBtn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.20);
+}
+
+/* ========================================================================== */
+/*                                CONFIRM MODAL                               */
+/* ========================================================================== */
+
 .annConfirmOverlay {
   position: fixed;
   inset: 0;
@@ -343,7 +590,7 @@ textarea.ecoInput {
 .annConfirmTitle {
   margin: 0;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .annConfirmClose {
@@ -354,7 +601,93 @@ textarea.ecoInput {
   border-radius: 10px;
 }
 
-/* mic polish pentru modal content */
-.annConfirmModal .projectDetails {
+.annConfirmMsg {
   margin-top: 12px;
+  color: rgba(232, 247, 241, 0.90);
+  font-size: 13px;
+  line-height: 1.35;
 }
+
+.annConfirmFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.annSecondaryBtn {
+  border-radius: 14px;
+  height: 42px;
+  padding: 0 14px;
+  font-weight: 600;
+  cursor: pointer;
+
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(232, 247, 241, 0.92);
+}
+
+.annSecondaryBtn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.20);
+}
+
+.annPrimaryBtn,
+.annDangerBtn {
+  border-radius: 14px;
+  height: 42px;
+  padding: 0 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.22);
+  color: rgba(232, 247, 241, 0.95);
+}
+
+.annPrimaryBtn:active,
+.annDangerBtn:active {
+  transform: translateY(1px);
+}
+
+.annPrimaryBtn:hover {
+  background: rgba(34, 197, 94, 0.28);
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.annDangerBtn {
+  border-color: rgba(255, 120, 120, 0.25);
+  background: rgba(255, 120, 120, 0.10);
+  color: rgba(255, 190, 190, 0.92);
+}
+
+.annDangerBtn:hover {
+  border-color: rgba(255, 120, 120, 0.45);
+  background: rgba(255, 120, 120, 0.14);
+}
+
+.annPrimaryBtn:disabled,
+.annDangerBtn:disabled,
+.annSecondaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.annChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+
+  background: rgba(34, 197, 94, 0.18);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: rgba(232, 247, 241, 0.95);
+}
+
+

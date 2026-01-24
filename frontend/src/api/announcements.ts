@@ -50,3 +50,7 @@ export async function addAnnouncementComment(postId: number, content: string): P
 export const deleteAnnouncement = async (postId: number): Promise<void> => {
   await api.delete(`/api/announcements/${postId}`);
 };
+
+export async function deleteAnnouncementComment(commentId: number): Promise<void> {
+  await api.delete(`/api/announcements/comments/${commentId}`);
+}

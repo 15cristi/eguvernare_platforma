@@ -1,6 +1,6 @@
 /* src/pages/Publications.tsx */
 import { useEffect, useMemo, useRef, useState } from "react";
-import "./ExploreLists.css";
+import "./Publications.css";
 
 import api from "../api/axios";
 import {
@@ -16,6 +16,7 @@ import {
 } from "../api/publications";
 import type { PageResponse } from "../api/types";
 import { useNavigate } from "react-router-dom";
+import { openCv } from "../api/profile";
 
 import { getProfileByUserId } from "../api/profile";
 import { getOrCreateDirectConversation } from "../api/messages";
@@ -34,6 +35,7 @@ type PublicProfile = {
   expertAreas?: string[];
   expertise?: { area: string; description: string }[];
   resources?: { title: string; description: string; url: string }[];
+  cvUrl?: string;
 
   companyName?: string;
   companyDescription?: string;
@@ -414,123 +416,176 @@ function ProfileModal({
       .replace(/(^|\s)\S/g, (t) => t.toUpperCase());
   };
 
-  const showLink = (label: string, url?: string) => {
-    const v = (url || "").trim();
-    if (!v) return null;
-    const href = v.startsWith("http") ? v : `https://${v}`;
-    return (
-      <a className="annPill" href={href} target="_blank" rel="noreferrer">
-        {label}
-      </a>
-    );
-  };
+
 
   const canMessage = !!user.id && (typeof currentUserId !== "number" ? true : user.id !== currentUserId);
 
   return (
-    <div
-      className="annModalOverlay"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="annModal card" role="dialog" aria-modal="true">
-        <div className="annModalHead">
-          <div className="annModalTitle" style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <AvatarBubble name={title} avatarUrl={p?.avatarUrl} size={44} />
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 18 }}>{title}</div>
-              {user.role ? <div className="muted">{user.role}</div> : null}
-              {loc ? <div className="muted">{loc}</div> : null}
+    <div className="annModalOverlay"
+  onMouseDown={(e) => {
+    if (e.target === e.currentTarget) onClose();
+  }}
+>
+  <div className="annModal card" role="dialog" aria-modal="true">
+    <div className="annModalHead">
+      <div className="annModalTitle">
+        <AvatarBubble name={title} avatarUrl={p?.avatarUrl} size={44} />
+        <div>
+          <div className="annModalName">{title}</div>
+          {user.role ? <div className="muted">{user.role}</div> : null}
+          {loc ? <div className="muted">{loc}</div> : null}
+        </div>
+      </div>
+
+      <div className="annModalActions">
+        {canMessage ? (
+          <button type="button" className="btn-primary" onClick={() => onMessage(user.id)}>
+            Message
+          </button>
+        ) : null}
+
+        <button className="btn-outline" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </div>
+
+    <div className="annModalBody">
+  {loading ? <div className="muted">Loading…</div> : null}
+  {!loading && error ? <div className="muted">{error}</div> : null}
+
+  {!loading && !error && p ? (
+    <>
+      <div className="annRow2">
+        <div className="annInfoBox">
+          <div className="annInfoLabel">Profession</div>
+          <div className="annInfoValue">{p.profession || "-"}</div>
+        </div>
+
+        <div className="annInfoBox">
+          <div className="annInfoLabel">Faculty</div>
+          <div className="annInfoValue">{p.faculty || "-"}</div>
+        </div>
+      </div>
+
+      <div className="annInfoBox" style={{ marginTop: 12 }}>
+        <div className="annInfoLabel">University</div>
+        <div className="annInfoValue">{p.university || p.affiliation || "-"}</div>
+      </div>
+
+      {p.bio ? (
+        <div className="annInfoBox" style={{ marginTop: 12 }}>
+          <div className="annInfoLabel">Bio</div>
+          <div className="annInfoValue">{p.bio}</div>
+        </div>
+      ) : null}
+
+      <div className="annInfoBox" style={{ marginTop: 12 }}>
+        <div className="annInfoLabel">Collaborations</div>
+        <div className="annInfoValue">
+          <div className="annChips">
+            {p.openToProjects ? <span className="annChip">Open to projects</span> : null}
+            {p.openToMentoring ? <span className="annChip">Open to mentoring</span> : null}
+            {p.availability ? <span className="annChip">{prettyEnum(p.availability)}</span> : null}
+            {p.experienceLevel ? <span className="annChip">{prettyEnum(p.experienceLevel)}</span> : null}
+          </div>
+        </div>
+      </div>
+
+      {finalExpertise?.length ? (
+        <div className="annInfoBox" style={{ marginTop: 12 }}>
+          <div className="annInfoLabel">Expertise</div>
+          <div className="annInfoValue">
+            <div className="annList">
+              {finalExpertise.map((x, idx) => (
+                <div key={`${x.area}-${idx}`} className="annListRow">
+                  <div className="annListTitle">{x.area}</div>
+                  {x.description ? <div className="annListSub">{x.description}</div> : null}
+                </div>
+              ))}
             </div>
           </div>
+        </div>
+      ) : null}
 
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {canMessage ? (
-              <button type="button" className="btn-primary" onClick={() => onMessage(user.id)}>
-                Message
-              </button>
+      {p.resources?.length ? (
+        <div className="annInfoBox" style={{ marginTop: 12 }}>
+          <div className="annInfoLabel">Resources</div>
+          <div className="annInfoValue">
+            <div className="annList">
+              {p.resources.map((r, idx) => (
+                <div key={`${r.title}-${idx}`} className="annResourceRow">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="annListTitle">{r.title}</div>
+                    {r.description ? <div className="annListSub">{r.description}</div> : null}
+                  </div>
+                  {r.url ? (
+                    <button type="button" className="annLinkBtn" onClick={() => openCv(r.url)}>
+                      Open
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {p.companyName ? (
+        <div className="annInfoBox" style={{ marginTop: 12 }}>
+          <div className="annInfoLabel">Company</div>
+          <div className="annInfoValue">
+            <div className="annListTitle">{p.companyName}</div>
+            {p.companyDescription ? <div className="annListSub">{p.companyDescription}</div> : null}
+            {p.companyDomains?.length ? (
+              <div className="annChips" style={{ marginTop: 8 }}>
+                {p.companyDomains.map((d, i) => (
+                  <span key={`${d}-${i}`} className="annChip">
+                    {d}
+                  </span>
+                ))}
+              </div>
             ) : null}
+          </div>
+        </div>
+      ) : null}
 
-            <button className="btn-outline" type="button" onClick={onClose} aria-label="Close">
-              ×
+      {p.cvUrl ? (
+        <div className="annInfoBox" style={{ marginTop: 12 }}>
+          <div className="annInfoLabel">CV</div>
+          <div className="annInfoValue">
+            <button type="button" className="annLinkBtn" onClick={() => openCv(p.cvUrl!)}>
+              Open CV
             </button>
           </div>
         </div>
+      ) : null}
 
-        <div className="annModalBody">
-          {loading ? <div className="muted">Loading…</div> : null}
-          {!loading && error ? <div className="muted">{error}</div> : null}
 
-          {!loading && !error ? (
-            <>
-              {p?.headline ? <div style={{ marginBottom: 10 }}>{p.headline}</div> : null}
-              {p?.bio ? <div style={{ whiteSpace: "pre-wrap", marginBottom: 10 }}>{p.bio}</div> : null}
 
-              <div className="projectDetails" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {p?.affiliation ? (
-                  <div>
-                    <span className="k">Affiliation:</span> {p.affiliation}
-                  </div>
-                ) : null}
-                {p?.profession ? (
-                  <div>
-                    <span className="k">Profession:</span> {p.profession}
-                  </div>
-                ) : null}
-                {p?.university ? (
-                  <div>
-                    <span className="k">University:</span> {p.university}
-                  </div>
-                ) : null}
-                {p?.faculty ? (
-                  <div>
-                    <span className="k">Faculty:</span> {p.faculty}
-                  </div>
-                ) : null}
+        
 
-                {finalExpertise?.length ? (
-                  <div>
-                    <div className="k" style={{ marginBottom: 4 }}>
-                      Expertise
-                    </div>
-                    <ul style={{ margin: 0, paddingLeft: 18 }}>
-                      {finalExpertise.map((x, idx) => (
-                        <li key={idx}>
-                          <strong>{x.area}</strong>
-                          {x.description ? <span className="muted">, {x.description}</span> : null}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
 
-                {(p?.availability || p?.experienceLevel) ? (
-                  <div>
-                    {p?.availability ? (
-                      <>
-                        <span className="k">Availability:</span> {prettyEnum(p.availability)}{" "}
-                      </>
-                    ) : null}
-                    {p?.experienceLevel ? (
-                      <>
-                        <span className="k">Level:</span> {prettyEnum(p.experienceLevel)}
-                      </>
-                    ) : null}
-                  </div>
-                ) : null}
 
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 6 }}>
-                  {showLink("LinkedIn", p?.linkedinUrl)}
-                  {showLink("GitHub", p?.githubUrl)}
-                  {showLink("Website", p?.website)}
-                </div>
-              </div>
-            </>
-          ) : null}
-        </div>
-      </div>
-    </div>
+
+    </>
+  ) : null}
+</div>
+
+<div className="annModalFoot">
+  {canMessage ? (
+    <button type="button" className="btn-primary" onClick={() => onMessage(user.id)} disabled={loading}>
+      Message
+    </button>
+  ) : null}
+  <button className="btn-outline" type="button" onClick={onClose}>
+    Close
+  </button>
+</div>
+
+  </div>
+</div>
+
   );
 }
 
@@ -555,84 +610,138 @@ function PublicationDetailsModal({
   const name = joinName((publication as any).userFirstName, (publication as any).userLastName) || "User";
   const role = ((publication as any).userRole || "").trim() || "";
 
-  const showLine = (label: string, value?: any) => {
-    const v = String(value ?? "").trim();
-    if (!v) return null;
-    return (
-      <div>
-        <span className="k">{label}</span> {v}
-      </div>
-    );
-  };
+  
 
   return (
-    <div
-      className="annConfirmOverlay"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="annConfirmModal card" role="dialog" aria-modal="true" style={{ maxWidth: 760 }}>
-        <div className="annConfirmHead">
-          <h3 className="annConfirmTitle">Publication details</h3>
-          <button className="btn-outline annConfirmClose" type="button" onClick={onClose}>
-            ×
-          </button>
-        </div>
-
-        <div className="projectDetails" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>{(publication as any).title}</div>
-              {(publication as any).type ? <div className="muted">{prettyType((publication as any).type)}</div> : null}
-
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 6 }}>
-                <AvatarBubble name={name} avatarUrl={ownerAvatarUrl} size={34} />
-                <div className="muted">
-                  {name}
-                  {role ? <span style={{ marginLeft: 8, opacity: 0.85 }}>({role})</span> : null}
-                </div>
-              </div>
+  <div
+    className="annModalOverlay"
+    onMouseDown={(e) => {
+      if (e.target === e.currentTarget) onClose();
+    }}
+  >
+    <div className="annModal card" role="dialog" aria-modal="true">
+      <div className="annModalHead">
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <AvatarBubble name={name} avatarUrl={ownerAvatarUrl ?? null} size={44} />
+          <div style={{ minWidth: 0 }}>
+            <div className="annModalName" style={{ fontWeight: 800, fontSize: 18, lineHeight: 1.15 }}>
+              {(publication as any).title}
             </div>
-
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-              <button
-                type="button"
-                className="btn-outline"
-                onClick={() => onOpenProfile(ownerId, name, role)}
-                disabled={!ownerId}
-                title="Open profile"
-              >
-                Profile
-              </button>
-
-              {(publication as any).pdfPath ? (
-                <button type="button" className="btn-outline" onClick={() => onOpenPdf(publication)}>
-                  PDF
-                </button>
-              ) : null}
-
-              {(publication as any).externalLink ? (
-                <button type="button" className="btn-outline" onClick={() => openExternal((publication as any).externalLink)}>
-                  Link
-                </button>
-              ) : null}
+            <div className="muted" style={{ marginTop: 2 }}>
+              {prettyType((publication as any).type)}
+              {name ? ` · ${name}` : ""}
             </div>
           </div>
-
-          {showLine("Authors:", (publication as any).authors)}
-          {showLine("Keywords:", (publication as any).keywords)}
-          {showLine("Journal / Conference:", (publication as any).journalTitle)}
-          {showLine("Publisher:", (publication as any).publisher)}
-          {showLine("Volume / Issue:", (publication as any).volumeIssue)}
-          {showLine("Pages:", (publication as any).pages)}
-          {showLine("DOI:", (publication as any).doi)}
-          {showLine("Year:", (publication as any).year)}
-          {showLine("Published:", (publication as any).publishedDate)}
         </div>
+
+        <button className="btn-outline annConfirmClose" type="button" onClick={onClose} aria-label="Close">
+          ×
+        </button>
+      </div>
+
+      <div className="annModalBody">
+        <div className="annRow2">
+          <div className="annInfoBox">
+            <div className="annInfoLabel">Authors</div>
+            <div className="annInfoValue">{(publication as any).authors || "-"}</div>
+          </div>
+          <div className="annInfoBox">
+            <div className="annInfoLabel">Keywords</div>
+            <div className="annInfoValue">{(publication as any).keywords || "-"}</div>
+          </div>
+        </div>
+
+        <div className="annRow2" style={{ marginTop: 12 }}>
+          <div className="annInfoBox">
+            <div className="annInfoLabel">Journal / Conference</div>
+            <div className="annInfoValue">{(publication as any).journalTitle || "-"}</div>
+          </div>
+          <div className="annInfoBox">
+            <div className="annInfoLabel">Publisher</div>
+            <div className="annInfoValue">{(publication as any).publisher || "-"}</div>
+          </div>
+        </div>
+
+        <div className="annRow2" style={{ marginTop: 12 }}>
+          <div className="annInfoBox">
+            <div className="annInfoLabel">Volume / Issue</div>
+            <div className="annInfoValue">{(publication as any).volumeIssue || "-"}</div>
+          </div>
+          <div className="annInfoBox">
+            <div className="annInfoLabel">Pages</div>
+            <div className="annInfoValue">{(publication as any).pages || "-"}</div>
+          </div>
+        </div>
+
+        <div className="annRow2" style={{ marginTop: 12 }}>
+          <div className="annInfoBox">
+            <div className="annInfoLabel">DOI</div>
+            <div className="annInfoValue">{(publication as any).doi || "-"}</div>
+          </div>
+          <div className="annInfoBox">
+            <div className="annInfoLabel">Year</div>
+            <div className="annInfoValue">{(publication as any).year || "-"}</div>
+          </div>
+        </div>
+
+        <div className="annInfoBox" style={{ marginTop: 12 }}>
+          <div className="annInfoLabel">Published</div>
+          <div className="annInfoValue">{(publication as any).publishedDate || "-"}</div>
+        </div>
+
+
+        {((publication as any).pdfPath || (publication as any).externalLink) ? (
+          <div className="annInfoBox" style={{ marginTop: 12 }}>
+            <div className="annInfoLabel">Resources</div>
+            <div className="annInfoValue">
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {(publication as any).pdfPath ? (
+                  <button
+                    type="button"
+                    className="annLinkBtn"
+                    onClick={() => onOpenPdf(publication)}
+                  >
+                    PDF
+                  </button>
+                ) : null}
+
+                {(publication as any).externalLink ? (
+                  <button
+                    type="button"
+                    className="annLinkBtn"
+                    onClick={() => openExternal((publication as any).externalLink)}
+                  >
+                    Link
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="annModalFoot">
+        <button
+          type="button"
+          className="btn-outline"
+          onClick={() => onOpenProfile(ownerId, name, role)}
+          disabled={!ownerId}
+        >
+          Profile
+        </button>
+
+        
+
+
+
+        <button className="btn-outline" type="button" onClick={onClose}>
+          Close
+        </button>
       </div>
     </div>
-  );
+  </div>
+);
+
 }
 
 export default function PublicationsPage() {

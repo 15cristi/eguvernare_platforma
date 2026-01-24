@@ -4,12 +4,13 @@ import {
   addAnnouncementComment,
   createAnnouncement,
   deleteAnnouncement,
+  deleteAnnouncementComment,
   getAnnouncementsFeed,
   toggleAnnouncementLike,
   type PostDto
 } from "../api/announcements";
 import { uploadAvatarToCloudinary } from "../api/cloudinary";
-import { getProfileByUserId } from "../api/profile";
+import { getProfileByUserId, openCv } from "../api/profile";
 import { AuthContext } from "../context/AuthContext";
 import { getOrCreateDirectConversation } from "../api/messages";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +26,7 @@ type PublicProfile = {
   university?: string;
   faculty?: string;
 
+  cvUrl?: string;
   expertAreas?: string[];
   expertise?: { area: string; description: string }[];
   resources?: { title: string; description: string; url: string }[];
@@ -41,6 +43,7 @@ type PublicProfile = {
   linkedinUrl?: string;
   githubUrl?: string;
   website?: string;
+
   avatarUrl?: string;
 };
 
@@ -66,6 +69,7 @@ export default function Announcements() {
 
   const [busyPostId, setBusyPostId] = useState<number | null>(null);
   const [deletingPostId, setDeletingPostId] = useState<number | null>(null);
+  const [busyCommentId, setBusyCommentId] = useState<number | null>(null);
 
   const [confirmDelete, setConfirmDelete] = useState<{
     open: boolean;
@@ -90,11 +94,31 @@ export default function Announcements() {
   const [profileError, setProfileError] = useState<string>("");
   const profileCache = useRef(new Map<number, PublicProfile>());
 
+  // Avatar cache for feed (AuthorDto doesn't have avatarUrl)
+  const avatarsRef = useRef<Record<number, string | null>>({});
+  const [avatars, setAvatars] = useState<Record<number, string | null>>({});
+
+  const fetchAvatar = async (userId: number) => {
+    if (!userId) return;
+    if (userId in avatarsRef.current) return;
+
+    avatarsRef.current[userId] = null;
+    try {
+      const p = (await getProfileByUserId(userId)) as PublicProfile;
+      avatarsRef.current[userId] = p?.avatarUrl ?? null;
+      setAvatars({ ...avatarsRef.current });
+    } catch {
+      avatarsRef.current[userId] = null;
+      setAvatars({ ...avatarsRef.current });
+    }
+  };
+
   const fileRef = useRef<HTMLInputElement | null>(null);
   const loadingRef = useRef(false);
 
   const openProfile = async (userId: number, name: string, role: string) => {
     setProfileUser({ id: userId, name, role });
+
     const cached = profileCache.current.get(userId) || null;
     setProfileData(cached);
 
@@ -105,6 +129,10 @@ export default function Announcements() {
       const data = (await getProfileByUserId(userId)) as PublicProfile;
       profileCache.current.set(userId, data);
       setProfileData(data);
+
+      // sync feed avatar cache too
+      avatarsRef.current[userId] = data?.avatarUrl ?? null;
+      setAvatars({ ...avatarsRef.current });
     } catch (e) {
       console.error(e);
       setProfileData(null);
@@ -130,6 +158,18 @@ export default function Announcements() {
 
     try {
       const data = await getAnnouncementsFeed(nextPage, 10);
+
+      // Prefetch avatars for authors + latest comments authors
+      for (const p of data) {
+        const authorId = (p as any)?.author?.id ?? 0;
+        if (authorId) fetchAvatar(authorId);
+
+        const comments = (p as any)?.latestComments ?? [];
+        for (const c of comments) {
+          const cid = (c as any)?.author?.id ?? 0;
+          if (cid) fetchAvatar(cid);
+        }
+      }
 
       setPosts((prev) => {
         if (mode === "replace") return data;
@@ -228,6 +268,9 @@ export default function Announcements() {
       const created = await createAnnouncement(text, imageUrl);
       setPosts((p) => [created, ...p]);
 
+      const newAuthorId = (created as any)?.author?.id ?? 0;
+      if (newAuthorId) fetchAvatar(newAuthorId);
+
       setDraft("");
       clearImage();
 
@@ -241,7 +284,7 @@ export default function Announcements() {
   };
 
   const onToggleLike = async (postId: number) => {
-    if (busyPostId || deletingPostId) return;
+    if (busyPostId || deletingPostId || busyCommentId) return;
     setBusyPostId(postId);
 
     setPosts((prev) =>
@@ -267,7 +310,7 @@ export default function Announcements() {
     const c = content.trim();
     if (!c) return;
 
-    if (busyPostId || deletingPostId) return;
+    if (busyPostId || deletingPostId || busyCommentId) return;
     setBusyPostId(postId);
 
     try {
@@ -279,6 +322,23 @@ export default function Announcements() {
       pushToast("error", "Failed to comment.");
     } finally {
       setBusyPostId(null);
+    }
+  };
+
+  const onDeleteComment = async (commentId: number) => {
+    if (!isAdmin) return;
+    if (busyPostId || deletingPostId || busyCommentId) return;
+
+    setBusyCommentId(commentId);
+    try {
+      await deleteAnnouncementComment(commentId);
+      pushToast("success", "Comment deleted.");
+      await refresh();
+    } catch (e) {
+      console.error(e);
+      pushToast("error", "Failed to delete comment.");
+    } finally {
+      setBusyCommentId(null);
     }
   };
 
@@ -396,54 +456,28 @@ export default function Announcements() {
             <PostCard
               key={p.id}
               post={p}
-              busy={busyPostId === p.id || deletingPostId === p.id}
+              avatars={avatars}
+              busy={busyPostId === p.id || deletingPostId === p.id || !!busyCommentId}
+              busyCommentId={busyCommentId}
               isAdmin={isAdmin}
               deleting={deletingPostId === p.id}
               onLike={() => onToggleLike(p.id)}
               onComment={(text) => onAddComment(p.id, text)}
               onDelete={() => requestDelete(p.id)}
+              onDeleteComment={onDeleteComment}
               onOpenProfile={(u) => openProfile(u.id, `${u.firstName} ${u.lastName}`, u.role)}
             />
           ))}
 
           <div className="annMore">
-            <button
-              className="btn-outline"
-              type="button"
-              onClick={() => loadPage(page + 1, "append")}
-              disabled={loadingMore}
-            >
+            <button className="btn-outline" type="button" onClick={() => loadPage(page + 1, "append")} disabled={loadingMore}>
               {loadingMore ? "Loading..." : "Load more"}
             </button>
           </div>
         </div>
       </div>
 
-      <aside className="annRight">
-        <div className="card annSideCard">
-          <div className="annSideTitle">
-            <strong>Quick stats</strong>
-            <span className="muted">Your current feed</span>
-          </div>
 
-          <div className="annSideGrid">
-            <div className="annSideStat">
-              <div className="muted">Posts loaded</div>
-              <strong>{totalPosts}</strong>
-            </div>
-            <div className="annSideStat">
-              <div className="muted">Likes</div>
-              <strong>{totalLikes}</strong>
-            </div>
-            <div className="annSideStat">
-              <div className="muted">Comments</div>
-              <strong>{totalComments}</strong>
-            </div>
-          </div>
-
-          <div className="annSideHint muted">Tip: photo posts look better if the image is at least 1200px wide.</div>
-        </div>
-      </aside>
 
       {profileUser && (
         <ProfileModal
@@ -474,24 +508,33 @@ export default function Announcements() {
 
 function PostCard({
   post,
+  avatars,
   busy,
+  busyCommentId,
   isAdmin,
   deleting,
   onLike,
   onComment,
   onDelete,
+  onDeleteComment,
   onOpenProfile
 }: {
   post: PostDto;
+  avatars: Record<number, string | null>;
   busy: boolean;
+  busyCommentId: number | null;
   isAdmin: boolean;
   deleting: boolean;
   onLike: () => void;
   onComment: (text: string) => void;
   onDelete: () => void;
+  onDeleteComment: (commentId: number) => void;
   onOpenProfile: (u: PostDto["author"]) => void;
 }) {
   const [c, setC] = useState("");
+
+  const authorId = post.author?.id ?? 0;
+  const avatarUrl = authorId ? avatars[authorId] ?? null : null;
 
   const send = () => {
     const text = c.trim();
@@ -504,7 +547,19 @@ function PostCard({
     <div className="card annPost">
       <div className="annPostHead">
         <button className="annAuthor annAuthorBtn" type="button" onClick={() => onOpenProfile(post.author)}>
-          <div className="avatarSmall" />
+          <div
+            className="avatarSmall"
+            style={
+              avatarUrl
+                ? {
+                    backgroundImage: `url(${avatarUrl})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    backgroundRepeat: "no-repeat"
+                  }
+                : undefined
+            }
+          />
           <div>
             <strong>
               {post.author.firstName} {post.author.lastName}
@@ -580,20 +635,55 @@ function PostCard({
             {post.latestComments
               .slice(0, 3)
               .reverse()
-              .map((cm) => (
-                <div className="annComment" key={cm.id}>
-                  <div className="avatarSmall" />
-                  <div className="annCommentBody">
-                    <button className="annInlineLink" type="button" onClick={() => onOpenProfile(cm.author)} title="View profile">
-                      <strong>
-                        {cm.author.firstName} {cm.author.lastName}
-                      </strong>
-                    </button>
-                    <div className="muted">{new Date(cm.createdAt).toLocaleString()}</div>
-                    <p>{cm.content}</p>
+              .map((cm) => {
+                const cmAuthorId = cm.author?.id ?? 0;
+                const cmAvatar = cmAuthorId ? avatars[cmAuthorId] ?? null : null;
+
+                return (
+                  <div className="annComment" key={cm.id}>
+                    <div
+                      className="avatarSmall"
+                      style={
+                        cmAvatar
+                          ? {
+                              backgroundImage: `url(${cmAvatar})`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                              backgroundRepeat: "no-repeat"
+                            }
+                          : undefined
+                      }
+                    />
+
+                    <div className="annCommentBody">
+                      <button className="annInlineLink" type="button" onClick={() => onOpenProfile(cm.author)} title="View profile">
+                        <strong>
+                          {cm.author.firstName} {cm.author.lastName}
+                        </strong>
+                      </button>
+
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 2 }}>
+                        <div className="muted">{new Date(cm.createdAt).toLocaleString()}</div>
+
+                        {isAdmin ? (
+                          <button
+                            className="btn-outline"
+                            type="button"
+                            onClick={() => onDeleteComment(cm.id)}
+                            disabled={busy || busyCommentId === cm.id}
+                            title="Delete comment"
+                            style={{ padding: "6px 10px", borderRadius: 12, height: "auto" }}
+                          >
+                            {busyCommentId === cm.id ? "Deleting..." : "Delete"}
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <p>{cm.content}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
           </div>
         )}
       </div>
@@ -692,7 +782,6 @@ function ProfileModal({
   const p = profile;
   const title = user?.name || "Profile";
 
-  const loc = [p?.city, p?.country].filter(Boolean).join(", ");
   const expertise = (p?.expertise && p.expertise.length > 0 ? p.expertise : null) || null;
   const fallbackAreas = !expertise && p?.expertAreas?.length ? p.expertAreas.map((a) => ({ area: a, description: "" })) : [];
   const finalExpertise = expertise || fallbackAreas;
@@ -704,17 +793,6 @@ function ProfileModal({
       .replaceAll("_", " ")
       .toLowerCase()
       .replace(/(^|\s)\S/g, (t) => t.toUpperCase());
-  };
-
-  const showLink = (label: string, url?: string) => {
-    const v = (url || "").trim();
-    if (!v) return null;
-    const href = v.startsWith("http") ? v : `https://${v}`;
-    return (
-      <a className="annPill" href={href} target="_blank" rel="noreferrer">
-        {label}
-      </a>
-    );
   };
 
   const canMessage = !!user?.id && !!currentUserId && user.id !== currentUserId;
@@ -736,150 +814,178 @@ function ProfileModal({
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 10 }}>
-            {canMessage ? (
-              <button className="btn-primary" type="button" onClick={() => onMessage(user!.id)}>
-                Message
-              </button>
-            ) : null}
-
-            <button className="btn-outline" type="button" onClick={onClose}>
-              Close
-            </button>
-          </div>
+          <button className="btn-outline" type="button" onClick={onClose} aria-label="Close">
+            ×
+          </button>
         </div>
 
-        {loading && <div className="muted">Loading…</div>}
-        {error && <div className="annError">{error}</div>}
+        {loading ? <div className="muted">Loading…</div> : null}
+        {!loading && error ? <div className="annError">{error}</div> : null}
 
-        {!loading && !error && p && (
-          <div className="annModalBody">
-            {p.headline?.trim() ? <div className="annHeadline">{p.headline}</div> : null}
-            {loc ? <div className="muted">{loc}</div> : null}
+        {!loading && !error && p ? (
+          <>
+            <div className="annModalBody">
+              <div className="annRow2">
+                <div className="annInfoBox">
+                  <div className="annInfoLabel">Profession</div>
+                  <div className="annInfoValue">{p.profession || "-"}</div>
+                </div>
 
-            {p.bio?.trim() ? <div className="annBio">{p.bio}</div> : null}
+                <div className="annInfoBox">
+                  <div className="annInfoLabel">Faculty</div>
+                  <div className="annInfoValue">{p.faculty || "-"}</div>
+                </div>
+              </div>
 
-            <div className="annGrid">
-              {p.affiliation?.trim() ? (
-                <div>
-                  <div className="muted">Affiliation</div>
-                  <div>{p.affiliation}</div>
+              <div className="annInfoBox">
+                <div className="annInfoLabel">University</div>
+                <div className="annInfoValue">{p.university || p.affiliation || "-"}</div>
+              </div>
+
+              {p.bio?.trim() ? (
+                <div className="annInfoBox">
+                  <div className="annInfoLabel">Bio</div>
+                  <div className="annInfoValue">{p.bio}</div>
                 </div>
               ) : null}
 
-              {p.profession?.trim() ? (
-                <div>
-                  <div className="muted">Profession</div>
-                  <div>{p.profession}</div>
+              {(p.openToProjects || p.openToMentoring || p.availability?.trim() || p.experienceLevel?.trim()) ? (
+                <div className="annInfoBox">
+                  <div className="annInfoLabel">Collaborations</div>
+                  <div className="annInfoValue">
+                    <div className="annChips">
+                      {p.openToProjects ? <span className="annChip">Open to projects</span> : null}
+                      {p.openToMentoring ? <span className="annChip">Open to mentoring</span> : null}
+                      {p.availability?.trim() ? <span className="annChip">{prettyEnum(p.availability)}</span> : null}
+                      {p.experienceLevel?.trim() ? <span className="annChip">{prettyEnum(p.experienceLevel)}</span> : null}
+                    </div>
+                  </div>
                 </div>
               ) : null}
 
-              {p.faculty?.trim() ? (
-                <div>
-                  <div className="muted">Faculty</div>
-                  <div>{p.faculty}</div>
+              {finalExpertise?.length ? (
+                <div className="annInfoBox">
+                  <div className="annInfoLabel">Expertise</div>
+                  <div className="annInfoValue">
+                    <div className="annList">
+                      {finalExpertise.map((x, idx) => (
+                        <div className="annListRow" key={`${x.area}-${idx}`}>
+                          <div className="annListTitle">{x.area}</div>
+                          {x.description?.trim() ? <div className="annListSub">{x.description}</div> : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ) : null}
 
-              {p.university?.trim() ? (
-                <div>
-                  <div className="muted">University</div>
-                  <div>{p.university}</div>
+              {p.resources?.length ? (
+                <div className="annInfoBox">
+                  <div className="annInfoLabel">Resources</div>
+                  <div className="annInfoValue">
+                    <div className="annList">
+                      {p.resources.map((r, idx) => (
+                        <div className="annResourceRow" key={`${r.title}-${idx}`}>
+                          <div style={{ minWidth: 0 }}>
+                            <div className="annListTitle">{r.title}</div>
+                            {r.description?.trim() ? <div className="annListSub">{r.description}</div> : null}
+                          </div>
+                          {r.url?.trim() ? (
+                            <button type="button" className="annLinkBtn" onClick={() => openCv(r.url)}>
+                              Open
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {p.companyName?.trim() ? (
+                <div className="annInfoBox">
+                  <div className="annInfoLabel">Company</div>
+                  <div className="annInfoValue">
+                    <div className="annListTitle">{p.companyName}</div>
+                    {p.companyDescription?.trim() ? <div className="annListSub">{p.companyDescription}</div> : null}
+                    {p.companyDomains?.length ? (
+                      <div className="annChips" style={{ marginTop: 8 }}>
+                        {p.companyDomains.slice(0, 12).map((d, i) => (
+                          <span className="annChip" key={`${d}-${i}`}>
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {p.cvUrl?.trim() ? (
+                <div className="annInfoBox">
+                  <div className="annInfoLabel">CV</div>
+                  <div className="annInfoValue">
+                    <button type="button" className="annLinkBtn" onClick={() => openCv(p.cvUrl!)}>
+                      Open CV
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {(p.linkedinUrl?.trim() || p.githubUrl?.trim() || p.website?.trim()) ? (
+                <div className="annInfoBox">
+                  <div className="annInfoLabel">Links</div>
+                  <div className="annInfoValue">
+                    <div className="annChips">
+                      {p.linkedinUrl?.trim() ? (
+                        <a
+                          className="annChip"
+                          href={p.linkedinUrl.startsWith("http") ? p.linkedinUrl : `https://${p.linkedinUrl}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          LinkedIn
+                        </a>
+                      ) : null}
+                      {p.githubUrl?.trim() ? (
+                        <a
+                          className="annChip"
+                          href={p.githubUrl.startsWith("http") ? p.githubUrl : `https://${p.githubUrl}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          GitHub
+                        </a>
+                      ) : null}
+                      {p.website?.trim() ? (
+                        <a
+                          className="annChip"
+                          href={p.website.startsWith("http") ? p.website : `https://${p.website}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Website
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
               ) : null}
             </div>
 
-            {(p.openToProjects || p.openToMentoring || p.availability?.trim() || p.experienceLevel?.trim()) && (
-              <div className="annSection">
-                <div className="annSectionTitle">Collaborations</div>
-                <div className="annPills">
-                  {p.openToProjects ? <span className="annPill">Open to projects</span> : null}
-                  {p.openToMentoring ? <span className="annPill">Open to mentoring</span> : null}
-                  {p.availability?.trim() ? <span className="annPill">{prettyEnum(p.availability)}</span> : null}
-                  {p.experienceLevel?.trim() ? <span className="annPill">{prettyEnum(p.experienceLevel)}</span> : null}
-                </div>
-              </div>
-            )}
+            <div className="annModalFoot">
+              {canMessage ? (
+                <button className="btn-primary" type="button" onClick={() => onMessage(user!.id)} disabled={loading}>
+                  Message
+                </button>
+              ) : null}
 
-            {finalExpertise?.length ? (
-              <div className="annSection">
-                <div className="annSectionTitle">Expertise</div>
-                <div className="annList">
-                  {finalExpertise.map((x, idx) => (
-                    <div className="annListItem" key={`${x.area}-${idx}`}>
-                      <div className="annListTop">
-                        <strong>{x.area}</strong>
-                      </div>
-                      {x.description?.trim() ? <div className="muted">{x.description}</div> : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {p.resources?.length ? (
-              <div className="annSection">
-                <div className="annSectionTitle">Resources</div>
-                <div className="annList">
-                  {p.resources.map((r, idx) => (
-                    <div className="annListItem" key={`${r.title}-${idx}`}>
-                      <div className="annListTop">
-                        <strong>{r.title}</strong>
-                        {r.url?.trim() ? (
-                          <a
-                            className="annInlineLink"
-                            href={r.url.startsWith("http") ? r.url : `https://${r.url}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Open
-                          </a>
-                        ) : null}
-                      </div>
-                      {r.description?.trim() ? <div className="muted">{r.description}</div> : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {(p.companyName?.trim() || p.companyDescription?.trim() || p.companyDomains?.length) && (
-              <div className="annSection">
-                <div className="annSectionTitle">Company</div>
-                {p.companyName?.trim() ? (
-                  <div>
-                    <strong>{p.companyName}</strong>
-                  </div>
-                ) : null}
-                {p.companyDescription?.trim() ? (
-                  <div className="muted" style={{ marginTop: 6 }}>
-                    {p.companyDescription}
-                  </div>
-                ) : null}
-                {p.companyDomains?.length ? (
-                  <div className="annPills">
-                    {p.companyDomains.slice(0, 12).map((d) => (
-                      <span className="annPill" key={d}>
-                        {d}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            {(p.linkedinUrl?.trim() || p.githubUrl?.trim() || p.website?.trim()) && (
-              <div className="annSection">
-                <div className="annSectionTitle">Links</div>
-                <div className="annPills">
-                  {showLink("LinkedIn", p.linkedinUrl)}
-                  {showLink("GitHub", p.githubUrl)}
-                  {showLink("Website", p.website)}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+              <button className="btn-outline" type="button" onClick={onClose}>
+                Close
+              </button>
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );
