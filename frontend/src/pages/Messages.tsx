@@ -220,10 +220,11 @@ useEffect(() => {
 
   // și mai important: reîncearcă la fiecare reconnect
   const off = onWsConnect(() => {
-    // dacă după reconnect sub-ul vechi nu mai e valid, refacem
-    sub = null;
-    subscribeNow();
-  });
+      if (sub) sub.unsubscribe();
+      sub = null;
+      subscribeNow();
+    });
+
 
   return () => {
     off();
@@ -304,11 +305,10 @@ useEffect(() => {
     try {
       setText("");
       const msg = await sendMessageMultipart(activeId, t, pdfFile);
-      setMessages((m) => [...m, msg]);
+      //setMessages((m) => [...m, msg]);
 
       clearPdf();
 
-      // refresh list preview
       loadConversations().catch(() => {});
       nav(`/messages?c=${activeId}`, { replace: true });
     } catch (e: any) {

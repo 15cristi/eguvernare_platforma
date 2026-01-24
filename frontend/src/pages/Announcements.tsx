@@ -231,7 +231,7 @@ useEffect(() => {
               return {
                 ...p,
                 commentCount: (p.commentCount ?? 0) + 1,
-                latestComments: [...(p.latestComments ?? []), comment]
+              latestComments: [comment, ...(p.latestComments ?? [])].slice(0, 20)
               };
             });
           }
@@ -332,7 +332,6 @@ useEffect(() => {
       }
 
       const created = await createAnnouncement(text, imageUrl);
-      setPosts((p) => [created, ...p]);
 
       const newAuthorId = (created as any)?.author?.id ?? 0;
       if (newAuthorId) fetchAvatar(newAuthorId);
