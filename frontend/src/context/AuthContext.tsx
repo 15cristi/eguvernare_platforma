@@ -1,4 +1,5 @@
 import { createContext, useEffect, useState } from "react";
+import { connectWs, disconnectWs } from "../realtime/wsClient";
 
 export interface User {
   id: number;
@@ -49,6 +50,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     else localStorage.removeItem("token");
   };
 
+
+  useEffect(() => {
+  // conectăm WS când avem token, îl închidem când nu mai avem
+  if (token) connectWs(token);
+  else disconnectWs();
+
+  // la unmount, închidem
+  return () => disconnectWs();
+}, [token]);
+
   const setUser = (newUser: User | null) => {
     setUserState(newUser);
     if (newUser) localStorage.setItem("user", JSON.stringify(newUser));
@@ -59,6 +70,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setTokenState(null);
     setUserState(null);
     localStorage.clear();
+    disconnectWs();
   };
 
   return (

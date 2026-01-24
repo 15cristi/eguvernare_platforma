@@ -14,6 +14,7 @@ import { getProfileByUserId, openCv } from "../api/profile";
 import { AuthContext } from "../context/AuthContext";
 import { getOrCreateDirectConversation } from "../api/messages";
 import { useNavigate } from "react-router-dom";
+import { getWsClient } from "../realtime/wsClient";
 
 type PublicProfile = {
   headline?: string;
@@ -199,6 +200,71 @@ export default function Announcements() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+useEffect(() => {
+  const c = getWsClient();
+  if (!c) return;
+
+  let sub: any = null;
+
+  const trySub = () => {
+    if (!c.connected) return;
+    if (sub) return;
+
+    sub = c.subscribe("/topic/announcements", (msg) => {
+      const evt = JSON.parse(msg.body) as { type: string; data: any };
+
+      setPosts((prev) => {
+        switch (evt.type) {
+          case "announcement:created":
+            return [evt.data, ...prev];
+
+          case "announcement:deleted":
+            return prev.filter((p) => p.id !== evt.data.postId);
+
+          case "announcement:like:updated":
+            return prev.map((p) => (p.id === evt.data.id ? evt.data : p));
+
+          case "announcement:comment:created": {
+            const { postId, comment } = evt.data;
+            return prev.map((p) => {
+              if (p.id !== postId) return p;
+              return {
+                ...p,
+                commentCount: (p.commentCount ?? 0) + 1,
+                latestComments: [...(p.latestComments ?? []), comment]
+              };
+            });
+          }
+
+          case "announcement:comment:deleted": {
+            const { postId, commentId } = evt.data;
+            return prev.map((p) => {
+              if (p.id !== postId) return p;
+              return {
+                ...p,
+                commentCount: Math.max(0, (p.commentCount ?? 0) - 1),
+                latestComments: (p.latestComments ?? []).filter((c: any) => c.id !== commentId)
+              };
+            });
+          }
+
+          default:
+            return prev;
+        }
+      });
+    });
+  };
+
+  trySub();
+  const t = window.setInterval(trySub, 400);
+
+  return () => {
+    window.clearInterval(t);
+    if (sub) sub.unsubscribe();
+  };
+}, []);
+
+  
   useEffect(() => {
     if (!profileUser) return;
     const onKey = (e: KeyboardEvent) => {
@@ -385,9 +451,6 @@ export default function Announcements() {
     }
   };
 
-  const totalPosts = posts.length;
-  const totalLikes = posts.reduce((sum, p) => sum + (p.likeCount || 0), 0);
-  const totalComments = posts.reduce((sum, p) => sum + (p.commentCount || 0), 0);
 
   return (
     <div className="annShell">

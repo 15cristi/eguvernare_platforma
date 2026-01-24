@@ -13,6 +13,7 @@ import {
   type AttachmentDto
 } from "../api/messages";
 import { getProfileByUserId } from "../api/profile";
+import { getWsClient,onWsConnect  } from "../realtime/wsClient";
 
 import { deleteConversationForMe } from "../api/messages";
 
@@ -183,6 +184,55 @@ export default function MessagesPage() {
     loadMessages(activeId).catch(() => {});
   }, [activeId]);
 
+useEffect(() => {
+  if (!activeId) return;
+
+  let sub: any = null;
+
+  const subscribeNow = () => {
+    const c = getWsClient();
+    if (!c || !c.connected) return;
+    if (sub) return;
+
+    sub = c.subscribe(`/topic/conversations.${activeId}`, (msg) => {
+
+
+      const incoming = JSON.parse(msg.body) as MessageDto;
+
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === incoming.id)) return prev;
+        return [...prev, incoming];
+      });
+
+      // update preview în listă
+      setItems((prev) =>
+        prev.map((it) =>
+          it.conversationId === activeId
+            ? { ...it, lastMessagePreview: incoming.content ?? "" }
+            : it
+        )
+      );
+    });
+  };
+
+  // încearcă imediat (dacă e deja conectat)
+  subscribeNow();
+
+  // și mai important: reîncearcă la fiecare reconnect
+  const off = onWsConnect(() => {
+    // dacă după reconnect sub-ul vechi nu mai e valid, refacem
+    sub = null;
+    subscribeNow();
+  });
+
+  return () => {
+    off();
+    if (sub) sub.unsubscribe();
+  };
+}, [activeId]);
+
+
+
   useEffect(() => {
     if (!active?.otherUserId) {
       loadProfile(null).catch(() => {});
@@ -206,6 +256,7 @@ export default function MessagesPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [confirmHide.open]);
 
+  
   const closeChat = () => {
     setActiveId(null);
     setMessages([]);
