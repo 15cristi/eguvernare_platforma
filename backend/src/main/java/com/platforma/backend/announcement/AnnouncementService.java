@@ -4,12 +4,15 @@ import com.platforma.backend.announcement.dto.AnnouncementDtos.*;
 import com.platforma.backend.user.User;
 import com.platforma.backend.user.Role;
 import com.platforma.backend.user.UserRepository;
+import com.platforma.backend.ws.WsEvent;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class AnnouncementService {
@@ -18,17 +21,20 @@ public class AnnouncementService {
     private final AnnouncementLikeRepository likeRepo;
     private final AnnouncementCommentRepository commentRepo;
     private final UserRepository userRepo;
+    private final SimpMessagingTemplate messaging;
 
     public AnnouncementService(
             AnnouncementPostRepository postRepo,
             AnnouncementLikeRepository likeRepo,
             AnnouncementCommentRepository commentRepo,
-            UserRepository userRepo
+            UserRepository userRepo,
+            SimpMessagingTemplate messaging
     ) {
         this.postRepo = postRepo;
         this.likeRepo = likeRepo;
         this.commentRepo = commentRepo;
         this.userRepo = userRepo;
+        this.messaging = messaging;
     }
 
     private AuthorDto authorDto(User u) {
@@ -94,7 +100,10 @@ public class AnnouncementService {
         p.setImageUrl((imageUrl != null && !imageUrl.isBlank()) ? imageUrl : null);
 
         postRepo.save(p);
-        return postDto(p, myUserId);
+
+        PostDto dto = postDto(p, myUserId);
+        messaging.convertAndSend("/topic/announcements", new WsEvent("announcement:created", dto));
+        return dto;
     }
 
     @Transactional
@@ -112,7 +121,9 @@ public class AnnouncementService {
                 }
         );
 
-        return postDto(post, myUserId);
+        PostDto dto = postDto(post, myUserId);
+        messaging.convertAndSend("/topic/announcements", new WsEvent("announcement:like:updated", dto));
+        return dto;
     }
 
     @Transactional
@@ -129,7 +140,11 @@ public class AnnouncementService {
         c.setContent(content);
 
         commentRepo.save(c);
-        return commentDto(c);
+
+        CommentDto dto = commentDto(c);
+        messaging.convertAndSend("/topic/announcements",
+                new WsEvent("announcement:comment:created", Map.of("postId", postId, "comment", dto)));
+        return dto;
     }
 
     // ADMIN poate sterge orice postare; altfel doar owner
@@ -145,25 +160,30 @@ public class AnnouncementService {
             throw new RuntimeException("Not allowed");
         }
 
-        // Evita probleme FK: intai copii, apoi postarea
         likeRepo.deleteByPostId(postId);
         commentRepo.deleteByPostId(postId);
         postRepo.delete(post);
+
+        messaging.convertAndSend("/topic/announcements",
+                new WsEvent("announcement:deleted", Map.of("postId", postId)));
     }
 
+    // ADMIN sterge comment dupa id
     @Transactional
     public void deleteComment(Long requesterUserId, Long commentId) {
         User me = userRepo.findById(requesterUserId).orElseThrow();
-        AnnouncementComment c = commentRepo.findById(commentId).orElseThrow();
-
-        boolean isOwner = c.getAuthor() != null && c.getAuthor().getId().equals(requesterUserId);
-        boolean isAdmin = me.getRole() == Role.ADMIN;
-
-        if (!isOwner && !isAdmin) {
+        if (me.getRole() != Role.ADMIN) {
             throw new RuntimeException("Not allowed");
         }
 
-        commentRepo.delete(c);
-    }
+        AnnouncementComment c = commentRepo.findById(commentId).orElseThrow();
+        Long postId = c.getPost() != null ? c.getPost().getId() : null;
 
+        commentRepo.delete(c);
+
+        if (postId != null) {
+            messaging.convertAndSend("/topic/announcements",
+                    new WsEvent("announcement:comment:deleted", Map.of("postId", postId, "commentId", commentId)));
+        }
+    }
 }

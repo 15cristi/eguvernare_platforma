@@ -1,4 +1,3 @@
 package com.platforma.backend.ws;
 
-public class WsEvent {
-}
+public record WsEvent(String type, Object data) {}

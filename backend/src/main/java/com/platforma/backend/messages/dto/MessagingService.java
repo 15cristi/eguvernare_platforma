@@ -1,6 +1,5 @@
 package com.platforma.backend.messages;
 
-import com.platforma.backend.messages.dto.AttachmentDto;
 import com.platforma.backend.messages.dto.ConversationListItemDto;
 import com.platforma.backend.messages.dto.MessageDto;
 import com.platforma.backend.profile.ProfileRepository;
@@ -8,12 +7,14 @@ import com.platforma.backend.user.User;
 import com.platforma.backend.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -28,16 +29,16 @@ public class MessagingService {
     private final ProfileRepository profileRepository;
     private final MessageAttachmentRepository attachmentRepository;
 
+    private final SimpMessagingTemplate messaging; // ✅ ADD
+
     @Transactional
     public Conversation getOrCreateDirect(Long meId, Long otherUserId) {
         if (meId.equals(otherUserId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You can’t send a message to yourself.");
-
         }
 
         var existing = conversationRepository.findDirectBetween(meId, otherUserId);
         if (existing.isPresent()) {
-            // reactiveaza conversatia pentru mine, daca o marcasem deleted
             participantRepository.findByConversationIdAndUserId(existing.get().getId(), meId)
                     .ifPresent(cp -> {
                         if (cp.getDeletedAt() != null) {
@@ -99,7 +100,6 @@ public class MessagingService {
                 .toList();
     }
 
-    // Trimite mesaj text si/sau PDF (BLOB in DB)
     @Transactional
     public MessageDto sendMultipart(Long meId, Long conversationId, String content, MultipartFile file) {
         ensureMember(meId, conversationId);
@@ -113,18 +113,13 @@ public class MessagingService {
 
         if (hasFile) {
             String ct = file.getContentType();
-            // uneori browserul trimite null; acceptam si pe extensie ca fallback
             boolean looksPdf = "application/pdf".equalsIgnoreCase(ct)
                     || (file.getOriginalFilename() != null && file.getOriginalFilename().toLowerCase().endsWith(".pdf"));
 
-            if (!looksPdf) {
-                throw new RuntimeException("Only PDF allowed");
-            }
+            if (!looksPdf) throw new RuntimeException("Only PDF allowed");
 
             long max = 10L * 1024 * 1024; // 10 MB
-            if (file.getSize() > max) {
-                throw new RuntimeException("File too large (max 10MB)");
-            }
+            if (file.getSize() > max) throw new RuntimeException("File too large (max 10MB)");
         }
 
         var conv = conversationRepository.findById(conversationId).orElseThrow();
@@ -157,7 +152,12 @@ public class MessagingService {
         conv.setUpdatedAt(Instant.now());
         conversationRepository.save(conv);
 
-        return toDto(msg);
+        MessageDto dto = toDto(msg);
+
+        // ✅ BROADCAST către toți abonații conversației
+        messaging.convertAndSend("/topic/conversations." + conversationId, dto);
+
+        return dto;
     }
 
     @Transactional(readOnly = true)
@@ -209,5 +209,4 @@ public class MessagingService {
                 atts
         );
     }
-
 }

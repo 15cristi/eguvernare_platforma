@@ -76,6 +76,7 @@ public class AnnouncementController {
         service.deletePost(me.getId(), postId);
     }
 
+    // ADMIN delete comment
     @DeleteMapping("/comments/{commentId}")
     public void deleteComment(Authentication auth, @PathVariable Long commentId) {
         User me = myUser(auth);
