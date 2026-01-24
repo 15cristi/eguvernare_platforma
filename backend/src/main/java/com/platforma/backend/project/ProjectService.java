@@ -9,14 +9,22 @@ import org.springframework.data.domain.*;
 import java.util.stream.Collectors;
 
 import java.util.List;
-
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 @Service
 @RequiredArgsConstructor
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
+    private boolean isAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
 
+        return auth.getAuthorities().stream().anyMatch(a ->
+                "ROLE_ADMIN".equals(a.getAuthority()) || "ADMIN".equals(a.getAuthority())
+        );
+    }
     public List<Project> listByUserId(Long userId) {
         return projectRepository.findByUserIdOrderByIdDesc(userId);
     }
@@ -92,7 +100,9 @@ public class ProjectService {
         Project p = projectRepository.findById(projectId)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
 
-        if (!p.getUser().getId().equals(currentUserId)) {
+        boolean owner = p.getUser().getId().equals(currentUserId);
+
+        if (!owner && !isAdmin()) {
             throw new RuntimeException("Not allowed");
         }
 

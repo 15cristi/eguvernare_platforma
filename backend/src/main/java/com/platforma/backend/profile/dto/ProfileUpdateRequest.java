@@ -24,7 +24,7 @@ public record ProfileUpdateRequest(
         List<ExpertiseItemDto> expertise,
 
         List<ResourceItemDto> resources,
-
+        String cvUrl,
         String companyName,
         String companyDescription,
         List<String> companyDomains,

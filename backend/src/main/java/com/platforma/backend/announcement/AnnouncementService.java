@@ -150,4 +150,20 @@ public class AnnouncementService {
         commentRepo.deleteByPostId(postId);
         postRepo.delete(post);
     }
+
+    @Transactional
+    public void deleteComment(Long requesterUserId, Long commentId) {
+        User me = userRepo.findById(requesterUserId).orElseThrow();
+        AnnouncementComment c = commentRepo.findById(commentId).orElseThrow();
+
+        boolean isOwner = c.getAuthor() != null && c.getAuthor().getId().equals(requesterUserId);
+        boolean isAdmin = me.getRole() == Role.ADMIN;
+
+        if (!isOwner && !isAdmin) {
+            throw new RuntimeException("Not allowed");
+        }
+
+        commentRepo.delete(c);
+    }
+
 }

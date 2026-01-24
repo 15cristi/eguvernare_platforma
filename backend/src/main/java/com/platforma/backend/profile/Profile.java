@@ -81,7 +81,8 @@ public class Profile {
 
     @Enumerated(EnumType.STRING)
     private ExperienceLevel experienceLevel;
-
+    @Column(length = 700)
+    private String cvUrl;
     // 🔹 Links
     private String linkedinUrl;
     private String githubUrl;

@@ -75,4 +75,11 @@ public class AnnouncementController {
         if (me == null) throw new RuntimeException("Unauthorized");
         service.deletePost(me.getId(), postId);
     }
+
+    @DeleteMapping("/comments/{commentId}")
+    public void deleteComment(Authentication auth, @PathVariable Long commentId) {
+        User me = myUser(auth);
+        if (me == null) throw new RuntimeException("Unauthorized");
+        service.deleteComment(me.getId(), commentId);
+    }
 }

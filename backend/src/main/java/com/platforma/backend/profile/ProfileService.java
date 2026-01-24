@@ -52,6 +52,9 @@ public class ProfileService {
         p.setProfession(req.profession());
         p.setUniversity(req.university());
         p.setFaculty(req.faculty());
+        if (req.cvUrl() != null && !req.cvUrl().startsWith("blob:")) {
+            p.setCvUrl(req.cvUrl());
+        }
 
         // legacy
         p.setExpertAreas(req.expertAreas());
@@ -100,4 +103,13 @@ public class ProfileService {
         profile.setAvatarUrl(avatarUrl);
         return profileRepository.save(profile);
     }
+
+    public Profile updateCvUrl(Long userId, String cvUrl) {
+        Profile p = getProfile(userId);
+        p.setCvUrl(cvUrl);
+        return profileRepository.save(p);
+    }
+
+
+
 }

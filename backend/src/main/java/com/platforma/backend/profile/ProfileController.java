@@ -9,6 +9,13 @@ import com.platforma.backend.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Set;
 
 import java.util.List;
 import java.util.Map;
@@ -92,6 +99,7 @@ public class ProfileController {
                 p.getExpertAreas(),
                 expertise,
                 resources,
+                p.getCvUrl(),
                 p.getCompanyName(),
                 p.getCompanyDescription(),
                 p.getCompanyDomains(),
@@ -106,4 +114,54 @@ public class ProfileController {
                 user.getRole()
         );
     }
+
+    @PutMapping(value = "/me/cv/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, String> uploadCv(
+            @AuthenticationPrincipal User user,
+            @RequestParam("file") MultipartFile file
+    ) throws IOException {
+
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("No file uploaded");
+        }
+
+        Set<String> allowed = Set.of(
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+
+        String contentType = file.getContentType() == null ? "" : file.getContentType();
+        if (!allowed.contains(contentType)) {
+            throw new RuntimeException("Unsupported file type: " + contentType);
+        }
+
+        String original = file.getOriginalFilename() == null ? "cv" : file.getOriginalFilename();
+        String ext = "";
+        int dot = original.lastIndexOf('.');
+        if (dot >= 0 && dot < original.length() - 1) ext = original.substring(dot).toLowerCase();
+
+        if (!(ext.equals(".pdf") || ext.equals(".doc") || ext.equals(".docx"))) {
+            ext = contentType.equals("application/pdf") ? ".pdf"
+                    : contentType.equals("application/msword") ? ".doc"
+                    : ".docx";
+        }
+
+        Path dir = Path.of("uploads", "cv", String.valueOf(user.getId()));
+        Files.createDirectories(dir);
+
+        String filename = "cv_" + System.currentTimeMillis() + ext;
+        Path target = dir.resolve(filename).normalize();
+
+        Files.copy(file.getInputStream(), target);
+
+        String url = "/uploads/cv/" + user.getId() + "/" + filename;
+
+        profileService.updateCvUrl(user.getId(), url);
+        return Map.of("cvUrl", url);
+    }
+
+
+
+
 }
