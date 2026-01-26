@@ -18,14 +18,19 @@ public record ProfileResponse(
 
         String faculty,
 
-        // legacy (flat)
+        // legacy flat list
         List<String> expertAreas,
 
-        // new (with descriptions)
+        // new expertise (area + description)
         List<ExpertiseItemDto> expertise,
 
         List<ResourceItemDto> resources,
         String cvUrl,
+
+        // NEW: companies list
+        List<CompanyItemDto> companies,
+
+        // legacy single company (kept for older screens)
         String companyName,
         String companyDescription,
         List<String> companyDomains,

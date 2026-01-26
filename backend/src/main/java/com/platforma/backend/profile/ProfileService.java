@@ -81,9 +81,37 @@ public class ProfileService {
             p.setResources(items);
         }
 
-        p.setCompanyName(req.companyName());
-        p.setCompanyDescription(req.companyDescription());
-        p.setCompanyDomains(req.companyDomains());
+        if (req.companies() != null) {
+            if (p.getCompanies() == null) {
+                p.setCompanies(new java.util.ArrayList<>());
+            }
+            p.getCompanies().clear();
+
+            for (var c : req.companies()) {
+                if (c == null) continue;
+
+                ProfileCompany pc = ProfileCompany.builder()
+                        .profile(p)
+                        .name(c.name())
+                        .description(c.description())
+                        .domains(c.domains())
+                        .build();
+
+                p.getCompanies().add(pc);
+            }
+
+            // sync legacy from first company
+            ProfileCompany first = p.getCompanies().isEmpty() ? null : p.getCompanies().get(0);
+            p.setCompanyName(first == null ? null : first.getName());
+            p.setCompanyDescription(first == null ? null : first.getDescription());
+            p.setCompanyDomains(first == null ? null : first.getDomains());
+
+        } else {
+            // legacy update
+            p.setCompanyName(req.companyName());
+            p.setCompanyDescription(req.companyDescription());
+            p.setCompanyDomains(req.companyDomains());
+        }
 
         if (req.openToProjects() != null) p.setOpenToProjects(req.openToProjects());
         if (req.openToMentoring() != null) p.setOpenToMentoring(req.openToMentoring());

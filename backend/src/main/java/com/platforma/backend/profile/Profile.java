@@ -72,6 +72,12 @@ public class Profile {
     @Column(name = "domain", length = 120)
     private List<String> companyDomains;
 
+    // 🔹 Multiple companies (new) - same style as expertise
+    @OneToMany(mappedBy = "profile", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProfileCompany> companies;
+
+
+
     // 🔹 Matching signals
     private boolean openToProjects;
     private boolean openToMentoring;

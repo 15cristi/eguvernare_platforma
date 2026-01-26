@@ -1,4 +1,10 @@
 package com.platforma.backend.connections.dto;
 
-public class ConnectedProfileDto {
-}
+public record ConnectedProfileDto(
+        Long userId,
+        String firstName,
+        String lastName,
+        String role,
+        String headline,
+        String avatarUrl
+) {}

@@ -14,17 +14,17 @@ public record ProfileUpdateRequest(
         String affiliation,
         String profession,
         String university,
-
         String faculty,
 
-        // legacy (flat)
         List<String> expertAreas,
-
-        // new (with descriptions)
         List<ExpertiseItemDto> expertise,
-
         List<ResourceItemDto> resources,
         String cvUrl,
+
+        // NEW
+        List<CompanyItemDto> companies,
+
+        // legacy
         String companyName,
         String companyDescription,
         List<String> companyDomains,

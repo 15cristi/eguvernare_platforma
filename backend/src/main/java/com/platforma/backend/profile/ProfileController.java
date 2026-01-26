@@ -11,6 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
+import com.platforma.backend.profile.dto.CompanyItemDto;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -50,12 +51,15 @@ public class ProfileController {
     }
 
     @PutMapping("/me")
-    public Profile updateMyProfile(
+    public ProfileResponse updateMyProfile(
             @AuthenticationPrincipal User user,
             @RequestBody ProfileUpdateRequest req
     ) {
-        return profileService.updateProfile(user.getId(), req);
+        Profile updated = profileService.updateProfile(user.getId(), req);
+        return toResponse(updated, user);
     }
+
+
 
     @PutMapping("/me/avatar")
     public Profile saveAvatar(
@@ -85,6 +89,41 @@ public class ProfileController {
                     .collect(Collectors.toList());
         }
 
+        // companies (new shape), with fallback from legacy single-company fields
+        List<CompanyItemDto> companies = null;
+        if (p.getCompanies() != null && !p.getCompanies().isEmpty()) {
+            companies = p.getCompanies().stream()
+                    .map(c -> new CompanyItemDto(
+                            c.getName(),
+                            c.getDescription(),
+                            c.getDomains()
+                    ))
+                    .collect(Collectors.toList());
+        } else if (
+                (p.getCompanyName() != null && !p.getCompanyName().isBlank()) ||
+                        (p.getCompanyDescription() != null && !p.getCompanyDescription().isBlank()) ||
+                        (p.getCompanyDomains() != null && !p.getCompanyDomains().isEmpty())
+        ) {
+            companies = List.of(new CompanyItemDto(
+                    p.getCompanyName(),
+                    p.getCompanyDescription(),
+                    p.getCompanyDomains()
+            ));
+        }
+
+        // keep legacy fields in sync (for older UI that still reads them)
+        String companyName = p.getCompanyName();
+        String companyDescription = p.getCompanyDescription();
+        List<String> companyDomains = p.getCompanyDomains();
+
+        if ((companyName == null || companyName.isBlank())
+                && companies != null && !companies.isEmpty()) {
+            CompanyItemDto first = companies.get(0);
+            companyName = first.name();
+            companyDescription = first.description();
+            companyDomains = first.domains();
+        }
+
         return new ProfileResponse(
                 p.getHeadline(),
                 p.getBio(),
@@ -100,9 +139,15 @@ public class ProfileController {
                 expertise,
                 resources,
                 p.getCvUrl(),
-                p.getCompanyName(),
-                p.getCompanyDescription(),
-                p.getCompanyDomains(),
+
+                // NEW
+                companies,
+
+                // legacy
+                companyName,
+                companyDescription,
+                companyDomains,
+
                 p.isOpenToProjects(),
                 p.isOpenToMentoring(),
                 p.getAvailability(),
@@ -114,6 +159,7 @@ public class ProfileController {
                 user.getRole()
         );
     }
+
 
     @PutMapping(value = "/me/cv/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Map<String, String> uploadCv(
