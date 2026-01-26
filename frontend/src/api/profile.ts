@@ -3,6 +3,12 @@ import api from "./axios";
 /**
  * Tipul REAL al profilului, identic cu DB + backend
  */
+export type CompanyDto = {
+  name: string;
+  description: string;
+  domains: string[];
+};
+
 export interface ProfileUpdatePayload {
   headline?: string;
   bio?: string;
@@ -21,6 +27,9 @@ export interface ProfileUpdatePayload {
 
   resources?: { title: string; description: string; url: string }[];
 
+  companies?: CompanyDto[];
+
+
   companyName?: string;
   companyDescription?: string;
   companyDomains?: string[];
@@ -33,6 +42,7 @@ export interface ProfileUpdatePayload {
   githubUrl?: string;
   website?: string;
 }
+
 
 export const getMyProfile = async () => {
   const res = await api.get("/api/profile/me");

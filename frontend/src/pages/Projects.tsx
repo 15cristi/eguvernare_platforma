@@ -27,6 +27,12 @@ type Draft = {
   partners: string[];
 };
 
+type CompanyDto = {
+  name?: string;
+  description?: string;
+  domains?: string[];
+};
+
 type PublicProfile = {
   headline?: string;
   bio?: string;
@@ -43,6 +49,9 @@ type PublicProfile = {
   resources?: { title: string; description: string; url: string }[];
   cvUrl?: string;
 
+  companies?: CompanyDto[];
+
+  
   companyName?: string;
   companyDescription?: string;
   companyDomains?: string[];
@@ -65,6 +74,38 @@ const toUrl = (raw: string) => {
   if (!v) return "";
   return v.startsWith("http://") || v.startsWith("https://") ? v : `https://${v}`;
 };
+function getCompaniesForDisplay(p: {
+  companies?: CompanyDto[];
+  companyName?: string;
+  companyDescription?: string;
+  companyDomains?: string[];
+}): CompanyDto[] {
+  const fromNew = (p.companies || [])
+    .map((c) => ({
+      name: (c?.name || "").trim(),
+      description: (c?.description || "").trim(),
+      domains: c?.domains || []
+    }))
+    .filter((c) => c.name || c.description || (c.domains && c.domains.length > 0));
+
+  if (fromNew.length > 0) return fromNew;
+
+  const legacyOk =
+    (p.companyName && p.companyName.trim().length > 0) ||
+    (p.companyDescription && p.companyDescription.trim().length > 0) ||
+    (p.companyDomains && p.companyDomains.length > 0);
+
+  return legacyOk
+    ? [
+        {
+          name: p.companyName || "",
+          description: p.companyDescription || "",
+          domains: p.companyDomains || []
+        }
+      ]
+    : [];
+}
+
 
 function pickPage<T>(page: any): { items: T[]; pageIndex: number; hasMore: boolean } {
   if (!page) return { items: [], pageIndex: 0, hasMore: false };
@@ -270,26 +311,41 @@ function ProfileModal({
                   </div>
                 ) : null}
 
-                {profile.companyName ? (
-                  <div className="annInfoBox" style={{ marginTop: 12 }}>
-                    <div className="annInfoLabel">Company</div>
-                    <div className="annInfoValue">
-                      <div className="annListTitle">{profile.companyName}</div>
-                      {profile.companyDescription ? <div className="annListSub">{profile.companyDescription}</div> : null}
-                      {profile.companyDomains?.length ? (
-                        <div className="annChips" style={{ marginTop: 8 }}>
-                          {profile.companyDomains.map((d, i) => (
-                            <span key={`${d}-${i}`} className="annChip">
-                              {d}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
+                {(() => {
+                    const companies = getCompaniesForDisplay(profile);
+                    if (companies.length === 0) return null;
 
+                    return (
+                      <div className="annInfoBox" style={{ marginTop: 12 }}>
+                        <div className="annInfoLabel">Companies</div>
+                        <div className="annInfoValue">
+                          <div className="annList">
+                            {companies.map((c, idx) => (
+                              <div key={`${c.name || "company"}-${idx}`} className="annResourceRow">
+                                <div style={{ minWidth: 0 }}>
+                                  {c.name ? <div className="annListTitle">{c.name}</div> : null}
+                                  {c.description ? <div className="annListSub">{c.description}</div> : null}
+
+                                  {c.domains?.length ? (
+                                    <div className="annChips" style={{ marginTop: 8 }}>
+                                      {c.domains.map((d, i) => (
+                                        <span key={`${d}-${i}`} className="annChip">
+                                          {d}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+              </div>
+                
 
               {profile.cvUrl ? (
                 <div className="annInfoBox" style={{ marginTop: 12 }}>
@@ -307,12 +363,57 @@ function ProfileModal({
               ) : null}
 
 
+            {(profile.linkedinUrl?.trim() || profile.githubUrl?.trim() || profile.website?.trim()) ? (
+            <div className="annInfoBox" style={{ marginTop: 12 }}>
+              <div className="annInfoLabel">Links</div>
+              <div className="annInfoValue">
+                <div className="annChips">
+                  {profile.linkedinUrl?.trim() ? (
+                    <a
+                      className="annChip"
+                      href={profile.linkedinUrl.startsWith("http") ? profile.linkedinUrl : `https://${profile.linkedinUrl}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      LinkedIn
+                    </a>
+                  ) : null}
+
+                  {profile.githubUrl?.trim() ? (
+                    <a
+                      className="annChip"
+                      href={profile.githubUrl.startsWith("http") ? profile.githubUrl : `https://${profile.githubUrl}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      GitHub
+                    </a>
+                  ) : null}
+
+                  {profile.website?.trim() ? (
+                    <a
+                      className="annChip"
+                      href={profile.website.startsWith("http") ? profile.website : `https://${profile.website}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Website
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+
+
 
             </>
           ) : null}
           
+          
 
-
+          
           
         </div>
           

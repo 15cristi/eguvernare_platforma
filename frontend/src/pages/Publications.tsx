@@ -21,6 +21,12 @@ import { openCv } from "../api/profile";
 import { getProfileByUserId } from "../api/profile";
 import { getOrCreateDirectConversation } from "../api/messages";
 
+type CompanyDto = {
+  name?: string;
+  description?: string;
+  domains?: string[];
+};
+
 type PublicProfile = {
   headline?: string;
   bio?: string;
@@ -36,6 +42,7 @@ type PublicProfile = {
   expertise?: { area: string; description: string }[];
   resources?: { title: string; description: string; url: string }[];
   cvUrl?: string;
+  companies?: CompanyDto[];
 
   companyName?: string;
   companyDescription?: string;
@@ -243,6 +250,39 @@ type Tab = "MINE" | "EXPLORE";
 
 /* ===== UI helpers: toast + confirm ===== */
 type Toast = { id: number; type: "success" | "error" | "info"; message: string };
+
+function getCompaniesForDisplay(p: {
+  companies?: CompanyDto[];
+  companyName?: string;
+  companyDescription?: string;
+  companyDomains?: string[];
+}): CompanyDto[] {
+  const fromNew = (p.companies || [])
+    .map((c) => ({
+      name: (c?.name || "").trim(),
+      description: (c?.description || "").trim(),
+      domains: c?.domains || []
+    }))
+    .filter((c) => c.name || c.description || (c.domains && c.domains.length > 0));
+
+  if (fromNew.length > 0) return fromNew;
+
+  const legacyOk =
+    (p.companyName && p.companyName.trim().length > 0) ||
+    (p.companyDescription && p.companyDescription.trim().length > 0) ||
+    (p.companyDomains && p.companyDomains.length > 0);
+
+  return legacyOk
+    ? [
+        {
+          name: p.companyName || "",
+          description: p.companyDescription || "",
+          domains: p.companyDomains || []
+        }
+      ]
+    : [];
+}
+
 
 function ToastStack({ toasts, onClose }: { toasts: Toast[]; onClose: (id: number) => void }) {
   if (!toasts.length) return null;
@@ -531,24 +571,39 @@ function ProfileModal({
         </div>
       ) : null}
 
-      {p.companyName ? (
+      {(() => {
+      const companies = getCompaniesForDisplay(profile);
+      if (companies.length === 0) return null;
+
+      return (
         <div className="annInfoBox" style={{ marginTop: 12 }}>
-          <div className="annInfoLabel">Company</div>
+          <div className="annInfoLabel">Companies</div>
           <div className="annInfoValue">
-            <div className="annListTitle">{p.companyName}</div>
-            {p.companyDescription ? <div className="annListSub">{p.companyDescription}</div> : null}
-            {p.companyDomains?.length ? (
-              <div className="annChips" style={{ marginTop: 8 }}>
-                {p.companyDomains.map((d, i) => (
-                  <span key={`${d}-${i}`} className="annChip">
-                    {d}
-                  </span>
-                ))}
-              </div>
-            ) : null}
+            <div className="annList">
+              {companies.map((c, idx) => (
+                <div key={`${c.name || "company"}-${idx}`} className="annResourceRow">
+                  <div style={{ minWidth: 0 }}>
+                    {c.name ? <div className="annListTitle">{c.name}</div> : null}
+                    {c.description ? <div className="annListSub">{c.description}</div> : null}
+
+                    {c.domains?.length ? (
+                      <div className="annChips" style={{ marginTop: 8 }}>
+                        {c.domains.map((d, i) => (
+                          <span key={`${d}-${i}`} className="annChip">
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      ) : null}
+      );
+    })()}
+
 
       {p.cvUrl ? (
         <div className="annInfoBox" style={{ marginTop: 12 }}>
@@ -562,7 +617,47 @@ function ProfileModal({
       ) : null}
 
 
+      {(p.linkedinUrl?.trim() || p.githubUrl?.trim() || p.website?.trim()) ? (
+      <div className="annInfoBox" style={{ marginTop: 12 }}>
+        <div className="annInfoLabel">Links</div>
+        <div className="annInfoValue">
+          <div className="annChips">
+            {p.linkedinUrl?.trim() ? (
+              <a
+                className="annChip"
+                href={p.linkedinUrl.startsWith("http") ? p.linkedinUrl : `https://${p.linkedinUrl}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                LinkedIn
+              </a>
+            ) : null}
 
+            {p.githubUrl?.trim() ? (
+              <a
+                className="annChip"
+                href={p.githubUrl.startsWith("http") ? p.githubUrl : `https://${p.githubUrl}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                GitHub
+              </a>
+            ) : null}
+
+            {p.website?.trim() ? (
+              <a
+                className="annChip"
+                href={p.website.startsWith("http") ? p.website : `https://${p.website}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Website
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    ) : null}
         
 
 

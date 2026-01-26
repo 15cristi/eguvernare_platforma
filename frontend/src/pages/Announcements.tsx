@@ -16,6 +16,12 @@ import { getOrCreateDirectConversation } from "../api/messages";
 import { useNavigate } from "react-router-dom";
 import { getWsClient } from "../realtime/wsClient";
 
+type CompanyDto = {
+  name?: string;
+  description?: string;
+  domains?: string[];
+};
+
 type PublicProfile = {
   headline?: string;
   bio?: string;
@@ -35,6 +41,7 @@ type PublicProfile = {
   companyName?: string;
   companyDescription?: string;
   companyDomains?: string[];
+  companies?: CompanyDto[];
 
   openToProjects?: boolean;
   openToMentoring?: boolean;
@@ -49,6 +56,38 @@ type PublicProfile = {
 };
 
 type Toast = { id: number; type: "success" | "error" | "info"; message: string };
+function getCompaniesForDisplay(p: {
+  companies?: CompanyDto[];
+  companyName?: string;
+  companyDescription?: string;
+  companyDomains?: string[];
+}): CompanyDto[] {
+  const fromNew: CompanyDto[] = (p.companies || [])
+    .map((c: CompanyDto): CompanyDto => ({
+      name: (c?.name || "").trim(),
+      description: (c?.description || "").trim(),
+      domains: c?.domains || []
+    }))
+    .filter((c: CompanyDto) => !!(c.name || c.description || (c.domains && c.domains.length > 0)));
+
+  if (fromNew.length > 0) return fromNew;
+
+  const legacyOk =
+    (p.companyName && p.companyName.trim().length > 0) ||
+    (p.companyDescription && p.companyDescription.trim().length > 0) ||
+    (p.companyDomains && p.companyDomains.length > 0);
+
+  return legacyOk
+    ? [
+        {
+          name: p.companyName || "",
+          description: p.companyDescription || "",
+          domains: p.companyDomains || []
+        }
+      ]
+    : [];
+}
+
 
 export default function Announcements() {
   const { user } = useContext(AuthContext);
@@ -149,6 +188,7 @@ export default function Announcements() {
     setProfileLoading(false);
     setProfileError("");
   };
+
 
   const loadPage = async (nextPage: number, mode: "replace" | "append") => {
     if (loadingRef.current) return;
@@ -964,24 +1004,39 @@ function ProfileModal({
                 </div>
               ) : null}
 
-              {p.companyName?.trim() ? (
-                <div className="annInfoBox">
-                  <div className="annInfoLabel">Company</div>
-                  <div className="annInfoValue">
-                    <div className="annListTitle">{p.companyName}</div>
-                    {p.companyDescription?.trim() ? <div className="annListSub">{p.companyDescription}</div> : null}
-                    {p.companyDomains?.length ? (
-                      <div className="annChips" style={{ marginTop: 8 }}>
-                        {p.companyDomains.slice(0, 12).map((d, i) => (
-                          <span className="annChip" key={`${d}-${i}`}>
-                            {d}
-                          </span>
+              {(() => {
+                const companies = getCompaniesForDisplay(p);
+                if (companies.length === 0) return null;
+
+                return (
+                  <div className="annInfoBox">
+                    <div className="annInfoLabel">Companies</div>
+                    <div className="annInfoValue">
+                      <div className="annList">
+                        {companies.map((c, idx) => (
+                          <div className="annResourceRow" key={`${c.name || "company"}-${idx}`}>
+                            <div style={{ minWidth: 0 }}>
+                              {c.name?.trim() ? <div className="annListTitle">{c.name}</div> : null}
+                              {c.description?.trim() ? <div className="annListSub">{c.description}</div> : null}
+
+                              {c.domains?.length ? (
+                                <div className="annChips" style={{ marginTop: 8 }}>
+                                  {c.domains.slice(0, 12).map((d, i) => (
+                                    <span className="annChip" key={`${d}-${i}`}>
+                                      {d}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
                         ))}
                       </div>
-                    ) : null}
+                    </div>
                   </div>
-                </div>
-              ) : null}
+                );
+              })()}
+
 
               {p.cvUrl?.trim() ? (
                 <div className="annInfoBox">

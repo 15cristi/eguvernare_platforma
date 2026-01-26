@@ -9,7 +9,9 @@ import Announcements from "./pages/Announcements";
 import Projects from "./pages/Projects";
 import Publications from "./pages/Publications";
 import Messages from "./pages/Messages";
-
+import Matching from "./pages/Matching";
+import Connections from "./pages/Connections";
+import ConnectionRequests from "./pages/ConnectionRequests";
 function App() {
   return (
     <Routes>
@@ -23,8 +25,10 @@ function App() {
         <Route path="/announcements" element={<Announcements />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/publications" element={<Publications />} />
-        <Route path="/Messages" element={<Messages />} />
-
+        <Route path="/messages" element={<Messages />} />
+        <Route path="/matching" element={<Matching />} />
+        <Route path="/connections" element={<Connections />} />
+        <Route path="/connections/requests" element={<ConnectionRequests />} />
       </Route>
     </Routes>
   );

@@ -24,6 +24,12 @@ interface ResourceItem extends IdItem {
   url: string;
 }
 
+interface CompanyItem extends IdItem {
+  name: string;
+  description: string;
+  domains: string[];
+}
+
 interface Profile {
   headline: string;
   bio: string;
@@ -42,6 +48,10 @@ interface Profile {
   expertise: ExpertiseItem[];
   resources: ResourceItem[];
 
+  // ✅ NEW
+  companies: CompanyItem[];
+
+  // legacy kept for compatibility (synced from first company)
   companyName: string;
   companyDescription: string;
   companyDomains: string[];
@@ -57,20 +67,15 @@ interface Profile {
 
   avatarUrl?: string;
   cvUrl?: string;
-
 }
 
 const norm = (s: string) => s.trim().replace(/\s+/g, " ");
 const suggest = (category: LookupCategory, q: string) => suggestLookup(category, q);
 const upsert = (category: LookupCategory, value: string) => upsertLookup(category, value);
 
-
-
-
-
 // Stable id generator (works in modern browsers; fallback included)
 const makeId = () =>
-  (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `id_${Date.now()}_${Math.random()}`);
+  typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `id_${Date.now()}_${Math.random()}`;
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -103,6 +108,27 @@ export default function ProfilePage() {
           url: x.url || ""
         }));
 
+        // ✅ companies: new shape with fallback from legacy single-company fields
+        const companiesFromApi: any[] = data.companies || [];
+        const companies: CompanyItem[] =
+          companiesFromApi.length > 0
+            ? companiesFromApi.map((c: any) => ({
+                id: makeId(),
+                name: c.name || "",
+                description: c.description || "",
+                domains: c.domains || []
+              }))
+            : data.companyName || data.companyDescription || (data.companyDomains || []).length > 0
+              ? [
+                  {
+                    id: makeId(),
+                    name: data.companyName || "",
+                    description: data.companyDescription || "",
+                    domains: data.companyDomains || []
+                  }
+                ]
+              : [];
+
         setProfile({
           headline: data.headline || "",
           bio: data.bio || "",
@@ -119,10 +145,13 @@ export default function ProfilePage() {
           resources,
           cvUrl: data.cvUrl,
 
+          // ✅ NEW
+          companies,
 
-          companyName: data.companyName || "",
-          companyDescription: data.companyDescription || "",
-          companyDomains: data.companyDomains || [],
+          // legacy synced from first company (or backend legacy if present)
+          companyName: companies[0]?.name || data.companyName || "",
+          companyDescription: companies[0]?.description || data.companyDescription || "",
+          companyDomains: companies[0]?.domains || data.companyDomains || [],
 
           availability: data.availability || "FULL_TIME",
           experienceLevel: data.experienceLevel || "JUNIOR",
@@ -164,11 +193,10 @@ export default function ProfilePage() {
       p.avatarUrl,
       p.expertise,
       p.cvUrl,
-
       p.resources,
-      p.companyName,
-      p.companyDescription,
-      p.companyDomains
+
+      // ✅ NEW: companies
+      p.companies
     ];
 
     const filled = fields.filter((v) => {
@@ -219,6 +247,14 @@ export default function ProfilePage() {
         resources: profile.resources.map((x) => ({ title: x.title, description: x.description, url: x.url })),
         cvUrl: profile.cvUrl && !profile.cvUrl.startsWith("blob:") ? profile.cvUrl : undefined,
 
+        // ✅ NEW
+        companies: profile.companies.map((c) => ({
+          name: c.name,
+          description: c.description,
+          domains: c.domains || []
+        })),
+
+        // legacy (backend also syncs it from first company)
         companyName: profile.companyName,
         companyDescription: profile.companyDescription,
         companyDomains: profile.companyDomains,
@@ -308,7 +344,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -329,28 +365,25 @@ export default function ProfilePage() {
 
               {profile.cvUrl ? (
                 <button
-              type="button"
-              className="btnSecondary"
-              disabled={!profile.cvUrl || uploading}
-              onClick={async () => {
-                if (!profile.cvUrl) return;
-                try {
-                  await openCv(profile.cvUrl);
-                } catch (e) {
-                  console.error(e);
-                  alert("Could not open CV");
-                }
-              }}
-            >
-              View CV
-            </button>
-
+                  type="button"
+                  className="btnSecondary"
+                  disabled={!profile.cvUrl || uploading}
+                  onClick={async () => {
+                    if (!profile.cvUrl) return;
+                    try {
+                      await openCv(profile.cvUrl);
+                    } catch (e) {
+                      console.error(e);
+                      alert("Could not open CV");
+                    }
+                  }}
+                >
+                  View CV
+                </button>
               ) : (
                 <small className="hint">No CV uploaded</small>
               )}
             </div>
-
-
           </div>
         </div>
       </div>
@@ -410,7 +443,7 @@ export default function ProfilePage() {
         </div>
 
         <SinglePicker
-          label="Faculty"
+          label="University"
           category="FACULTY"
           value={profile.faculty}
           onChange={(v) => update("faculty", v)}
@@ -449,7 +482,11 @@ export default function ProfilePage() {
 
         <div className="toggles">
           <Toggle label="Open to projects" checked={profile.openToProjects} onChange={(v) => update("openToProjects", v)} />
-          <Toggle label="Open to mentoring" checked={profile.openToMentoring} onChange={(v) => update("openToMentoring", v)} />
+          <Toggle
+            label="Open to mentoring"
+            checked={profile.openToMentoring}
+            onChange={(v) => update("openToMentoring", v)}
+          />
         </div>
       </div>
 
@@ -484,30 +521,25 @@ export default function ProfilePage() {
         <ResourcesEditor items={profile.resources} onChange={(items) => update("resources", items)} />
       </div>
 
-      {/* COMPANY */}
+      {/* COMPANIES */}
       <div className="card">
         <div className="card-header">
           <span>🏢</span>
-          <h2>Company details</h2>
-          <InfoTip text="If relevant, add company info and domains. Otherwise you can leave it blank." />
+          <h2>Companies</h2>
+          <InfoTip text="Add one or more companies and their domains. You can leave it blank." />
         </div>
 
-        <label>
-          Company name
-          <input value={profile.companyName} onChange={(e) => update("companyName", e.target.value)} />
-        </label>
+        <CompaniesEditor
+          items={profile.companies}
+          onChange={(items) => {
+            update("companies", items);
 
-        <label>
-          Company description
-          <textarea value={profile.companyDescription} onChange={(e) => update("companyDescription", e.target.value)} />
-        </label>
-
-        <TagPicker
-          label="Domains"
-          category="COMPANY_DOMAIN"
-          values={profile.companyDomains || []}
-          onChange={(vals) => update("companyDomains", vals)}
-          placeholder="Search or add a domain"
+            // sync legacy from first company
+            const first = items[0];
+            update("companyName", first?.name || "");
+            update("companyDescription", first?.description || "");
+            update("companyDomains", first?.domains || []);
+          }}
         />
       </div>
 
@@ -668,6 +700,60 @@ function ResourcesEditor({ items, onChange }: ResourcesEditorProps) {
 
       <button type="button" className="btnSecondary" onClick={add} style={{ marginTop: 12 }}>
         + Add resource
+      </button>
+    </div>
+  );
+}
+
+/* ---------- Companies editor ---------- */
+type CompaniesEditorProps = {
+  items: CompanyItem[];
+  onChange: (items: CompanyItem[]) => void;
+};
+
+function CompaniesEditor({ items, onChange }: CompaniesEditorProps) {
+  const updateItem = (idx: number, patch: Partial<CompanyItem>) => {
+    const next = items.map((it, i) => (i === idx ? { ...it, ...patch } : it));
+    onChange(next);
+  };
+
+  const add = () => onChange([...(items || []), { id: makeId(), name: "", description: "", domains: [] }]);
+  const remove = (idx: number) => onChange(items.filter((_, i) => i !== idx));
+
+  return (
+    <div>
+      {items.length === 0 && <small className="hint">Optional: add a company if you represent an organization.</small>}
+
+      {items.map((it, idx) => (
+        <div key={it.id} className="subcard">
+          <label>
+            Company name
+            <input value={it.name || ""} onChange={(e) => updateItem(idx, { name: e.target.value })} />
+          </label>
+
+          <label>
+            Company description
+            <textarea value={it.description || ""} onChange={(e) => updateItem(idx, { description: e.target.value })} />
+          </label>
+
+          <TagPicker
+            label="Domains"
+            category="COMPANY_DOMAIN"
+            values={it.domains || []}
+            onChange={(vals) => updateItem(idx, { domains: vals })}
+            placeholder="Search or add a domain"
+          />
+
+          <div className="actionsRow">
+            <button type="button" className="btnDanger" onClick={() => remove(idx)}>
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+
+      <button type="button" className="btnSecondary" onClick={add} style={{ marginTop: 12 }}>
+        + Add company
       </button>
     </div>
   );

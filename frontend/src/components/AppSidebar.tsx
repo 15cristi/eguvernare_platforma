@@ -2,10 +2,12 @@ import { useContext, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { getMyProfile } from "../api/profile";
-
+import { getIncomingConnectionRequests } from "../api/connections";
+import { onWsConnect, safeSubscribe } from "../realtime/wsClient";
 export default function AppSidebar() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [pendingRequests, setPendingRequests] = useState(0);
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -26,6 +28,36 @@ export default function AppSidebar() {
       cancelled = true;
     };
   }, []);
+useEffect(() => {
+  let cancelled = false;
+
+  const refresh = async () => {
+    try {
+      const reqs = await getIncomingConnectionRequests();
+      if (!cancelled) setPendingRequests(reqs.length);
+    } catch {
+      // ignorăm
+    }
+  };
+
+  const onLocal = () => refresh();
+  window.addEventListener("connections:requests-updated", onLocal);
+
+  refresh();
+
+  const unsubOnConnect = onWsConnect(() => {
+    const sub = safeSubscribe("/user/queue/notifications", () => {
+      refresh();
+    });
+    return () => sub?.unsubscribe();
+  });
+
+  return () => {
+    cancelled = true;
+    window.removeEventListener("connections:requests-updated", onLocal);
+    unsubOnConnect();
+  };
+}, []);
 
   return (
     <aside className="sidebar">
@@ -79,10 +111,26 @@ export default function AppSidebar() {
 
 
 
-          <button className="nav-item ghost" type="button">
-            <span className="nav-ico">🧰</span>
-            Matching
-          </button>
+          <NavLink to="/matching" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+          <span className="nav-ico">🧰</span>
+          Matching
+        </NavLink>
+
+              <NavLink
+                to="/connections"
+                end
+                className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+              >
+                <span className="nav-ico">🤝</span>
+                Connections
+              </NavLink>
+
+              <NavLink to="/connections/requests" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+                <span className="nav-ico">🔔</span>
+                Requests
+                {pendingRequests > 0 ? <span className="badge">{pendingRequests}</span> : null}
+              </NavLink>
+
         </nav>
       </div>
 

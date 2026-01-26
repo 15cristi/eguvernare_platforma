@@ -5,7 +5,7 @@ import { useContext, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { loginUser, loginWithGoogle } from "../api/auth";
 import { useNavigate } from "react-router-dom";
-import { FaShieldAlt, FaUsers, FaBolt, FaEnvelope, FaLock } from "react-icons/fa";
+import {  FaUsers, FaEnvelope, FaLock } from "react-icons/fa";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -32,9 +32,10 @@ const Login = () => {
   const data = await loginWithGoogle(res.credential);
 
   setToken(data.token);
-  setUser(data.user); // 🔥 LINIA LIPSĂ
+  setUser(data.user);
   navigate("/dashboard");
 };
+
 
 
   return (
